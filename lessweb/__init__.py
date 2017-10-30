@@ -3,7 +3,7 @@
 
 from .webapi import HttpError
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 __author__ = [
     'qorzj <inull@qq.com>',
 ]
@@ -14,7 +14,7 @@ from . import application, context, model, storage, webapi
 
 from .application import interceptor, Application
 from .context import Context
-from .model import rest_param, need_param, choose_param, tips, get_tips, get_annotations
+from .model import rest_param, need_param, choose_param, unchoose_param, tips, get_tips, get_annotations
 from .model import get_func_parameters, get_model_parameters, Model
 from .storage import Storage, global_data
 from .webapi import HttpError, BadRequestError, NeedParamError, BadParamError

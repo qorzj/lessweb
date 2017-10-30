@@ -89,9 +89,9 @@ def interceptor(hook):
         >>> ret = build_controller(controller)(ctx)
         >>> assert list(ret) == ['ctx', 'id', 'lpn'], ret
     """
-    def _1_wrapper(hook):
+    def _1_wrapper(fn):
         def _1_1_controller(ctx):
-            ctx.app_stack.append(build_controller(hook))
+            ctx.app_stack.append(build_controller(fn))
             params = fetch_param(ctx, hook)
             result = hook(ctx, **params)
             ctx.app_stack.pop()  # 有多次调用ctx()的可能性，比如批量删除
@@ -163,9 +163,9 @@ class Application(object):
 
         try:
             f = build_controller(_1_mapping_match())
-            for hook in self.interceptors:
-                if ctx.path.startswith(hook.prefix) and (hook.method == ctx.method or hook.method == '*'):
-                    f = interceptor(hook.hook)(f)
+            for itr in self.interceptors:
+                if ctx.path.startswith(itr.prefix) and (itr.method == ctx.method or itr.method == '*'):
+                    f = interceptor(itr.hook)(f)
             return f(ctx)
         except HttpError as e:
             e.update(ctx)

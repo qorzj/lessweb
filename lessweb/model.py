@@ -97,9 +97,9 @@ def get_annotations(x):
 
 def get_model_parameters(cls):
     annos = get_annotations(cls)
+    inst = cls()
     defaults = {
-        k: v for k, v in cls.__dict__.items()
-        if not callable(v)  # 结果主要用来展示，所以是判断callable
+        k: getattr(inst, k, _nil) for k in cls.__dict__
     }
     return [
         (k, annos.get(k, _nil), defaults.get(k, _nil))
@@ -112,7 +112,8 @@ def get_model_parameters(cls):
 class Model:
     def setall(self, **kwargs):
         for k, v in kwargs.items():
-            setattr(self, k, v)
+            if k[0] != '_':
+                setattr(self, k, v)
 
     def items(self):
         return {
@@ -158,7 +159,7 @@ def input_by_choose(ctx: Context, fn, key, rest_param: RestParam):
         raise BadParamError(query=queryname, error=str(e))
 
 
-def fetch_model_param(ctx: Context, cls):
+def fetch_model_param(ctx: Context, cls, fn):
     """
 
         >>> @rest_param('weight', getter=int, queryname='w')
@@ -166,9 +167,10 @@ def fetch_model_param(ctx: Context, cls):
         ...     name: str
         ...     age: int
         ...     weight = None
+        >>> def get_person(ctx, person: Person): pass
         >>> ctx = Context()
         >>> ctx._fields = dict(name='Bob', age='33', w='100', x='1')
-        >>> model = fetch_model_param(ctx, Person)
+        >>> model = fetch_model_param(ctx, Person, get_person)
         >>> assert model.items() == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
     """
     restparam_tips = {k:v for k,v in get_tips(cls, 'rest-param')}
@@ -188,7 +190,7 @@ def fetch_model_param(ctx: Context, cls):
             default = None if default is _nil else default
             param = RestParam(getter=vartype, default=default, doc=key)
 
-        value = input_by_choose(ctx, cls, key, param)
+        value = input_by_choose(ctx, fn, key, param)
         result[key] = value
     model = cls()
     model.setall(**result)
@@ -213,8 +215,8 @@ def fetch_param(ctx: Context, fn):
             result[key] = ctx.pipe[key]
             continue
 
-        if isinstance(anno, Model):
-            result[key] = fetch_model_param(ctx, anno)
+        if isinstance(anno, type) and issubclass(anno, Model):
+            result[key] = fetch_model_param(ctx, anno, fn)
             continue
 
         if key in restparam_tips:
