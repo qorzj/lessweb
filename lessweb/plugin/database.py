@@ -5,10 +5,10 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from ..storage import global_data
 
-__all__ = ["DBModel", "init", "processor", "create_all", "make_session"]
+__all__ = ["DbModel", "init", "processor", "create_all", "make_session"]
 
 
-DBModel = declarative_base()
+DbModel = declarative_base()
 
 
 def init(conf):
@@ -40,7 +40,7 @@ def processor(ctx):
 
 
 def create_all():
-    DBModel.metadata.create_all(global_data.db_engine)
+    DbModel.metadata.create_all(global_data.db_engine)
 
 
 @contextmanager

@@ -171,7 +171,7 @@ class Application(object):
             e.update(ctx)
             return e.text
 
-    def add_interceptor(self, prefix, method, hook):
+    def add_interceptor(self, hook, prefix='/', method='*'):
         """
         Example:
 
