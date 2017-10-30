@@ -1,5 +1,5 @@
 from unittest import TestCase
-from salar.sugar import _ext
+from lessweb.sugar import _ext
 
 
 class TestExt(TestCase):

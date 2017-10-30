@@ -17,7 +17,7 @@ from lessweb.storage import global_data
 
 
 __all__ = [
-    "ModelView", "Interceptor", "Mapping", "Serializer", "interceptor", "application",
+    "ModelView", "Interceptor", "Mapping", "Serializer", "interceptor", "Application",
 ]
 
 
@@ -102,14 +102,14 @@ def interceptor(hook):
     return _1_wrapper
 
 
-class application(object):
+class Application(object):
     """
     Application to delegate requests based on path.
 
     Example:
 
-        from salar import application
-        app = application()
+        from salar import Application
+        app = Application()
         app.add_mapping('/hello', lambda ctx: 'Hello!')
         app.run(port=8080)
 
@@ -175,8 +175,8 @@ class application(object):
         """
         Example:
 
-            from salar import application
-            app = application()
+            from salar import Application
+            app = Application()
             app.add_interceptor('/', '*', lambda ctx: ctx() + ' world!')
             app.add_mapping('/hello', lambda ctx: 'Hello')
             app.run()
@@ -187,12 +187,12 @@ class application(object):
         """
         Example:
 
-            from salar import application
+            from salar import Application
             def sayhello(ctx, name):
                 return 'Hello %s!' % name
             def sayage(ctx, age: int, name='Bob'):
                 return 'Name: %s, Age: %d' % (name, age)
-            app = application()
+            app = Application()
             app.add_mapping('/hello/(?P<name>.+)', 'GET', sayhello)
             app.add_mapping('/age/(?P<age>[0-9]+)', 'GET', sayhello)
             app.run()
@@ -208,8 +208,8 @@ class application(object):
         Example:
 
             from datetime import datetime
-            from salar import application
-            app = application()
+            from salar import Application
+            app = Application()
             app.add_serializer(varclass=datetime, func=lambda x: x.strftime('%H:%M:%S'))
             app.add_mapping('/now', 'GET', lambda ctx: {'time': datetime.now()})
             app.run()
@@ -224,7 +224,7 @@ class application(object):
         把obj序列化为str
 
             >>> from datetime import datetime
-            >>> app = application(encoding='utf-8')
+            >>> app = Application(encoding='utf-8')
             >>> app.add_serializer(varclass=datetime, func=lambda x: x.strftime('%Y-%m-%d'))
             >>> app.serialize({'time': datetime(2000, 1, 1)})
             '{"time": "2000-01-01"}'
@@ -244,7 +244,7 @@ class application(object):
             Example:
 
                 import salar
-                app = salar.application()
+                app = salar.Application()
                 app.add_interceptor('/', '*', lambda ctx: ctx() + ' world!')
                 app.add_mapping('/hello', lambda ctx: 'Hello')
                 application = app.wsgifunc()
@@ -300,8 +300,8 @@ class application(object):
         """
         Example:
 
-            from salar import application
-            app = application()
+            from salar import Application
+            app = Application()
             app.add_interceptor('/', '*', lambda ctx: ctx() + ' world!')
             app.add_mapping('/hello', lambda ctx: 'Hello')
             app.run(port=80)

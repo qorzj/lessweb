@@ -23,7 +23,7 @@ class MyInstall(install):
 setup(
         name = 'lessweb',
         version=version,
-        description='Web framework and Tookit for generating command line interfaces',
+        description='Web framework for python3.6+',
         long_description='\nREADME: https://github.com/qorzj/lessweb',
         url='https://github.com/qorzj/lessweb',
         author='qorzj',
