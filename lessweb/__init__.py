@@ -1,4 +1,4 @@
-"""salar.py: 用最python3的方法创建web apps"""
+"""lessweb: 用最python3的方法创建web apps"""
 
 
 from .webapi import HttpError
