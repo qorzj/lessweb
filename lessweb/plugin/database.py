@@ -12,7 +12,7 @@ __all__ = ["DbModel", "init", "processor", "create_all", "make_session"]
 
 
 def _db_model_items(self):
-    return {k: v for k, v in self.__dict__ if k[0] != '_'}
+    return {k: v for k, v in self.__dict__.items() if k[0] != '_'}
 
 
 def _db_model_setall(self, **kwargs):
