@@ -1,6 +1,9 @@
+import time
+
 from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import InterfaceError
 from sqlalchemy.ext.declarative import declarative_base
 
 from ..storage import global_data
@@ -39,8 +42,16 @@ def processor(ctx):
     return ret
 
 
-def create_all():
-    DbModel.metadata.create_all(global_data.db_engine)
+def create_all(timeout=0):
+    start_at = time.time()
+    while 1:
+        try:
+            DbModel.metadata.create_all(global_data.db_engine)
+            return
+        except InterfaceError as e:
+            if time.time() - start_at > timeout:
+                raise e
+            time.sleep(1)
 
 
 @contextmanager

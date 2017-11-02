@@ -93,7 +93,7 @@ class Context(object):
 
     def is_json_request(self):
         return self.json_input is not None or \
-               self.env.get('CONTENT_TYPE', '').lower() == 'application/json'
+               'json' in self.env.get('CONTENT_TYPE', '').lower()
 
     @property
     def field_input(self):
