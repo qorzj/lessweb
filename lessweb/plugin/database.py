@@ -7,6 +7,7 @@ from sqlalchemy.exc import InterfaceError
 from sqlalchemy.ext.declarative import declarative_base
 
 from ..storage import global_data
+from ..model import Model
 
 __all__ = ["DbModel", "init", "processor", "create_all", "make_session"]
 
@@ -21,9 +22,19 @@ def _db_model_setall(self, **kwargs):
             setattr(self, k, v)
 
 
-DbModel = declarative_base()
+def _db_model_copy(self, **kwargs):
+    ret = self.__class__()
+    ret.setall(**self.items())
+    ret.setall(**kwargs)
+    return ret
+
+
+DbModel: Model = declarative_base()
 DbModel.items = _db_model_items
 DbModel.setall = _db_model_setall
+DbModel.copy = _db_model_copy
+DbModel.__eq__ = lambda self, other: self is other or (type(self) == type(other) and self.items() == other.items())
+DbModel.__repr__ = lambda self: '<DbModel ' + repr(self.items()) + '>'
 
 
 def init(conf):

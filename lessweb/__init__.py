@@ -3,7 +3,7 @@
 
 from .webapi import HttpError
 
-__version__ = '0.0.7'
+__version__ = '0.0.8'
 __author__ = [
     'qorzj <inull@qq.com>',
 ]

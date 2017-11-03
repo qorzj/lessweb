@@ -144,6 +144,18 @@ class Model:
             if hasattr(self, k)
         }
 
+    def copy(self, **kwargs):
+        ret = self.__class__()
+        ret.setall(**self.items())
+        ret.setall(**kwargs)
+        return ret
+
+    def __eq__(self, other):
+        return self is other or (type(self) == type(other) and self.items() == other.items())
+
+    def __repr__(self):
+        return '<Model ' + repr(self.items()) + '>'
+
 
 def input_by_choose(ctx: Context, fn, key, rest_param: RestParam):
     """
