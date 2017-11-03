@@ -23,8 +23,9 @@ class MyInstall(install):
 setup(
         name = 'lessweb',
         version=version,
-        description='Web framework for python3.6+',
-        long_description='\nREADME: https://github.com/qorzj/lessweb',
+        description='Web framework for python3.6+ 「嘞是web」',
+        long_description='\nREADME: https://github.com/qorzj/lessweb\n\n'
+                         'Usage Example: https://github.com/qorzj/reply-board',
         url='https://github.com/qorzj/lessweb',
         author='qorzj',
         author_email='inull@qq.com',
@@ -35,7 +36,7 @@ setup(
             ],
         keywords='lessweb web web.py',
         packages = ['lessweb', 'lessweb.plugin'],
-        install_requires=[],
+        install_requires=['aiohttp', 'aiohttp_wsgi'],
 
         cmdclass={'install': MyInstall},
         entry_points={
