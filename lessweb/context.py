@@ -1,12 +1,17 @@
 from typing import NamedTuple, Any, Callable, Optional, overload, Dict, List
 import cgi
 import json
+import os
+import gzip
+from wsgiref.handlers import format_date_time
+from datetime import datetime, timedelta
+from time import mktime
 
 from io import BytesIO
 
 from lessweb.sugar import *
 from lessweb.storage import Storage, global_data
-from lessweb.webapi import UploadedFile
+from lessweb.webapi import UploadedFile, HttpError, mimetypes
 
 
 def _process_fieldstorage(fs):
@@ -140,5 +145,33 @@ class Context(object):
         if ret is not _nil:
             return ret
         return self.field_input.get(queryname, default)
-    # ~class Context
 
+    def static_file(self, path, basepath='./static', max_age=900, enable_gzip=False):
+        """
+        Example:
+
+        """
+        if '..' in basepath:
+            raise HttpError(404, 'not found')
+        fullpath = os.path.join(basepath, path)
+        try:
+            data = open(fullpath, 'rb').read()
+            modify_stamp = os.path.getmtime(fullpath)
+        except:
+            raise HttpError(404, 'not found')
+        if enable_gzip and 'gzip' in self.get_header('Accept-Encoding'):
+            self.set_header('Content-Encoding', 'gzip')
+            data = gzip.compress(data)
+        expire_at = datetime.now() + timedelta(seconds=max_age)
+        expire_stamp = mktime(expire_at.timetuple())
+        self.set_header('Cache-Control', 'max-age=%d' % max_age)
+        self.set_header('Expires', format_date_time(expire_stamp))
+        self.set_header('Last-Modified', format_date_time(modify_stamp))
+        suffix = (path.rsplit('/', 1)[-1] if '/' in path else path)
+        if '.' in suffix:
+            suffix = suffix.rsplit('/', 1)[-1]
+            if suffix in mimetypes:
+                self.set_header('Content-Type', mimetypes[suffix])
+        return data
+
+    # ~class Context

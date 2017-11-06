@@ -2,7 +2,7 @@
 Web application
 (from salar.py)
 """
-from typing import NamedTuple, Any, Callable, Optional, overload, Dict, List
+from typing import NamedTuple, Any, Callable, Optional, overload, Dict, List, Tuple
 import itertools
 import json
 import os
@@ -29,10 +29,11 @@ class ModelView(NamedTuple):
 # ctx.interceptors: List[Interceptor]
 class Interceptor:
     """Interceptor to定义拦截器based on path prefix"""
-    def __init__(self, prefix, method, hook):
+    def __init__(self, prefix, method, hook, excludes):
         self.prefix: str = prefix
         self.method: str = method
         self.hook: Callable = hook
+        self.excludes: Tuple = excludes
 
 
 # ctx.mapping: List[Mapping]
@@ -164,14 +165,15 @@ class Application(object):
         try:
             f = build_controller(_1_mapping_match())
             for itr in self.interceptors:
-                if ctx.path.startswith(itr.prefix) and (itr.method == ctx.method or itr.method == '*'):
+                if ctx.path.startswith(itr.prefix) and (itr.method == ctx.method or itr.method == '*') \
+                        and all(not ctx.path.startswith(p) for p in itr.excludes):
                     f = interceptor(itr.hook)(f)
             return f(ctx)
         except HttpError as e:
             e.update(ctx)
             return e.text
 
-    def add_interceptor(self, hook, prefix='/', method='*'):
+    def add_interceptor(self, hook, prefix='/', method='*', excludes=('/static/',)):
         """
         Example:
 
@@ -181,7 +183,7 @@ class Application(object):
             app.add_mapping('/hello', lambda ctx: 'Hello')
             app.run()
         """
-        self.interceptors.insert(0, Interceptor(prefix, method, hook))
+        self.interceptors.insert(0, Interceptor(prefix, method, hook, excludes))
 
     def add_mapping(self, pattern, method, hook, doc=''):
         """
