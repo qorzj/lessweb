@@ -269,7 +269,7 @@ class Application(object):
             try:
                 _ = self._handle_with_hooks(ctx)
                 result = _1_peep(_) if isinstance(_, GeneratorType) else (_,)
-            except Exception as e:  #todo
+            except Exception as e:
                 import logging
                 logging.exception(e)
                 ctx.status_code, ctx.reason = 500, 'Internal Server Error'
