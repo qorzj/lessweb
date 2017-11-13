@@ -6,6 +6,8 @@ import gzip
 from wsgiref.handlers import format_date_time
 from datetime import datetime, timedelta
 from time import mktime
+from http.cookies import Morsel, SimpleCookie, CookieError
+from urllib.parse import unquote, quote
 
 from io import BytesIO
 
@@ -173,5 +175,35 @@ class Context(object):
             if suffix in mimetypes:
                 self.set_header('Content-Type', mimetypes[suffix])
         return data
+
+    def set_cookie(self, name, value, expires='', domain=None, secure=False, httponly=False, path=None):
+        """Set a cookie."""
+        morsel = Morsel()
+        morsel.set(name, value, quote(value))
+        if isinstance(expires, int) and expires < 0:
+            expires = -1000000000
+        morsel['expires'] = expires
+        morsel['path'] = path or self.homepath + '/'
+        if domain: morsel['domain'] = domain
+        if secure: morsel['secure'] = secure
+        value = morsel.OutputString()
+        if httponly: value += '; httponly'
+        self.set_header('Set-Cookie', value)
+
+    def get_cookie(self):
+        """Get cookies --> Dict"""
+        http_cookie = self.get_header('cookie')
+        cookie = SimpleCookie()
+        try:
+            cookie.load(http_cookie)
+        except CookieError:
+            cookie = SimpleCookie()
+            for attr_value in http_cookie.split(';'):
+                try:
+                    cookie.load(attr_value)
+                except CookieError:
+                    pass
+        cookies = dict([(k, unquote(v.value)) for k, v in cookie.items()])
+        return cookies
 
     # ~class Context

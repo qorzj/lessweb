@@ -298,7 +298,7 @@ class Application(object):
 
         return wsgi
 
-    def run(self, port: int=8080):
+    def run(self, wsgifunc=None, port: int=8080):
         """
         Example:
 
@@ -311,5 +311,7 @@ class Application(object):
         from aiohttp import web
         from aiohttp_wsgi import WSGIHandler
         app = web.Application()
-        app.router.add_route("*", "/{path_info:.*}", WSGIHandler(self.wsgifunc()))
+        if wsgifunc is None:
+            wsgifunc = self.wsgifunc()
+        app.router.add_route("*", "/{path_info:.*}", WSGIHandler(wsgifunc))
         web.run_app(app, port=port)

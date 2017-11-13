@@ -178,6 +178,9 @@ def input_by_choose(ctx: Context, fn, key, rest_param: RestParam):
     queryname = rest_param.queryname or key
     value = ctx.get_input(queryname, default=_nil)
     keys_will_choose = chooseparam_tips.get('choose', None)
+    if getter is None:
+        return rest_param.default
+
     if key in chooseparam_tips.get('need', []):
         if value is _nil:
             raise NeedParamError(query=queryname, doc=rest_param.doc)
