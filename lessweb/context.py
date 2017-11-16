@@ -124,7 +124,7 @@ class Context(object):
                 self._fields = {'__error__': 'invalid fields received'}
         return self._fields
 
-    def data(self):
+    def data(self) -> bytes:
         """
         Example:
 

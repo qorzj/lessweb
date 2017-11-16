@@ -238,12 +238,13 @@ def fetch_param(ctx: Context, fn):
     """
 
         >>> @rest_param('weight', getter=int, queryname='w')
-        ... def get_person(ctx, name: str, age: int, weight):
+        ... @rest_param('createAt', getter=None, default=2)
+        ... def get_person(ctx, name: str, age: int, weight, createAt:int=8):
         ...     pass
         >>> ctx = Context()
-        >>> ctx._fields = dict(name='Bob', age='33', w='100', weight='1')
+        >>> ctx._fields = dict(name='Bob', age='33', w='100', weight='1', createAt='9')
         >>> param = fetch_param(ctx, get_person)
-        >>> assert param == {'name': 'Bob', 'age': 33, 'weight': 100}, param
+        >>> assert param == {'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
     """
     restparam_tips = {k:v for k,v in get_tips(fn, 'rest-param')}
     result = {}

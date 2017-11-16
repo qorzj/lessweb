@@ -60,7 +60,7 @@ class SeeOther(HttpError):
 
     def update(self, ctx):
         ctx.status_code = self.status_code
-        ctx.reason = status_dict.get(ctx.status_code, 'Unknown')
+        ctx.reason = status_dict.get(ctx.status_code)
         ctx.headers = {
             'Content-Type': 'text/html',
             'Location': ctx.realhome + self.url,
