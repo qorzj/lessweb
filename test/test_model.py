@@ -36,19 +36,19 @@ class TestModel(TestCase):
         self.model = _tmp_cls()
 
     def test_items(self):
-        self.assertEqual(self.model.items(), {'a': 1, 'c': 2})
+        self.assertEqual(self.model.storage(), {'a': 1, 'c': 2})
 
     def test_copy(self):
         model = self.model.copy()
-        self.assertEqual(model.items(), {'a': 1, 'c': 2})
+        self.assertEqual(model.storage(), {'a': 1, 'c': 2})
         model2 = self.model.copy(b=3, c=4, _d=5)
-        self.assertEqual(model2.items(), {'a': 1, 'b': 3, 'c': 4})
+        self.assertEqual(model2.storage(), {'a': 1, 'b': 3, 'c': 4})
 
     def test_setall(self):
         model = self.model.copy()
-        self.assertEqual(model.items(), {'a': 1, 'c': 2})
+        self.assertEqual(model.storage(), {'a': 1, 'c': 2})
         model.setall(b=3, c=4, _d=5)
-        self.assertEqual(model.items(), {'a': 1, 'b': 3, 'c': 4})
+        self.assertEqual(model.storage(), {'a': 1, 'b': 3, 'c': 4})
 
     def test_eq(self):
         model = self.model.copy()

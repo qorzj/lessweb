@@ -171,7 +171,7 @@ class Context(object):
         self.set_header('Last-Modified', format_date_time(modify_stamp))
         suffix = (path.rsplit('/', 1)[-1] if '/' in path else path)
         if '.' in suffix:
-            suffix = suffix.rsplit('/', 1)[-1]
+            suffix = suffix.rsplit('.', 1)[-1]
             if suffix in mimetypes:
                 self.set_header('Content-Type', mimetypes[suffix])
         return data
@@ -192,7 +192,7 @@ class Context(object):
 
     def get_cookie(self):
         """Get cookies --> Dict"""
-        http_cookie = self.get_header('cookie')
+        http_cookie = self.get_header('cookie', '')
         cookie = SimpleCookie()
         try:
             cookie.load(http_cookie)

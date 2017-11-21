@@ -6,6 +6,7 @@ from typing import *
 from lessweb.context import Context
 from lessweb.sugar import _nil
 from lessweb.webapi import NeedParamError, BadParamError
+from lessweb.storage import Storage
 
 
 class RestParam:
@@ -137,24 +138,24 @@ class Model:
             if k[0] != '_':
                 setattr(self, k, v)
 
-    def items(self):
-        return {
+    def storage(self):
+        return Storage({
             k: getattr(self, k) for k, _, _
             in get_model_parameters(type(self))
             if hasattr(self, k)
-        }
+        })
 
     def copy(self, **kwargs):
         ret = self.__class__()
-        ret.setall(**self.items())
+        ret.setall(**self.storage())
         ret.setall(**kwargs)
         return ret
 
     def __eq__(self, other):
-        return self is other or (type(self) == type(other) and self.items() == other.items())
+        return self is other or (type(self) == type(other) and self.storage() == other.storage())
 
     def __repr__(self):
-        return '<Model ' + repr(self.items()) + '>'
+        return '<Model ' + repr(dict(self.storage())) + '>'
 
 
 def input_by_choose(ctx: Context, fn, key, rest_param: RestParam):
@@ -208,7 +209,7 @@ def fetch_model_param(ctx: Context, cls, fn):
         >>> ctx = Context()
         >>> ctx._fields = dict(name='Bob', age='33', w='100', x='1')
         >>> model = fetch_model_param(ctx, Person, get_person)
-        >>> assert model.items() == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
+        >>> assert model.storage() == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
     """
     restparam_tips = {k:v for k,v in get_tips(cls, 'rest-param')}
     result = {}

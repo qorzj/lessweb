@@ -57,6 +57,7 @@ class SeeOther(HttpError):
     def __init__(self, url):
         self.status_code: int = 303
         self.url = url
+        self.text = ''
 
     def update(self, ctx):
         ctx.status_code = self.status_code
