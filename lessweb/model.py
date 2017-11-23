@@ -133,11 +133,6 @@ def get_model_parameters(cls):
 
 
 class Model:
-    def setall(self, **kwargs):
-        for k, v in kwargs.items():
-            if k[0] != '_':
-                setattr(self, k, v)
-
     def storage(self):
         return Storage({
             k: getattr(self, k) for k, _, _
@@ -145,9 +140,18 @@ class Model:
             if hasattr(self, k)
         })
 
-    def copy(self, **kwargs):
+    def setall(self, *mapping, **kwargs):
+        if mapping:
+            self.setall(**mapping[0])
+        for k, v in kwargs.items():
+            if k[0] != '_':
+                setattr(self, k, v)
+
+    def copy(self, *mapping, **kwargs):
         ret = self.__class__()
         ret.setall(**self.storage())
+        if mapping:
+            ret.setall(**mapping[0])
         ret.setall(**kwargs)
         return ret
 

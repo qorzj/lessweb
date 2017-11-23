@@ -3,6 +3,7 @@ import cgi
 import json
 import os
 import gzip
+import requests
 from wsgiref.handlers import format_date_time
 from datetime import datetime, timedelta
 from time import mktime
@@ -13,7 +14,7 @@ from io import BytesIO
 
 from lessweb.sugar import *
 from lessweb.storage import Storage, global_data
-from lessweb.webapi import UploadedFile, HttpError, mimetypes
+from lessweb.webapi import UploadedFile, HttpError, mimetypes, hop_by_hop_headers
 
 
 def _process_fieldstorage(fs):
@@ -175,6 +176,20 @@ class Context(object):
             if suffix in mimetypes:
                 self.set_header('Content-Type', mimetypes[suffix])
         return data
+
+    def static_proxy(self, dist_host, fullpath=None):
+        headers = {}
+        for wsgi_key, value in self.env.items():
+            if wsgi_key.startswith('HTTP_'):
+                headers[wsgi_key[5:].replace('_', '-')] = value
+        if fullpath is None:
+            fullpath = self.fullpath
+        conn = requests.get(dist_host + fullpath, headers=headers)
+        resp_headers = {k: v for k, v in conn.headers.items() if k not in hop_by_hop_headers}
+        self.headers.update(resp_headers)
+        if conn.status_code > 299:
+            raise HttpError(conn.status_code, conn.text, self.headers)
+        return conn.content
 
     def set_cookie(self, name, value, expires='', domain=None, secure=False, httponly=False, path=None):
         """Set a cookie."""

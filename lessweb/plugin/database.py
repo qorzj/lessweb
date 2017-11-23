@@ -6,31 +6,35 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import InterfaceError
 from sqlalchemy.ext.declarative import declarative_base
 
-from ..storage import global_data
+from ..storage import global_data, Storage
 from ..model import Model
 
 __all__ = ["DbModel", "init", "processor", "create_all", "make_session"]
 
 
-def _db_model_items(self):
-    return {k: v for k, v in self.__dict__.items() if k[0] != '_'}
+def _db_model_storage(self):
+    return Storage({k: v for k, v in self.__dict__.items() if k[0] != '_'})
 
 
-def _db_model_setall(self, **kwargs):
+def _db_model_setall(self, *mapping, **kwargs):
+    if mapping:
+        _db_model_setall(**mapping[0])
     for k, v in kwargs.items():
         if k[0] != '_':
             setattr(self, k, v)
 
 
-def _db_model_copy(self, **kwargs):
+def _db_model_copy(self, *mapping, **kwargs):
     ret = self.__class__()
-    ret.setall(**self.items())
+    ret.setall(**self.storage())
+    if mapping:
+        ret.setall(**mapping[0])
     ret.setall(**kwargs)
     return ret
 
 
 DbModel: Model = declarative_base()
-DbModel.items = _db_model_items
+DbModel.storage = _db_model_storage
 DbModel.setall = _db_model_setall
 DbModel.copy = _db_model_copy
 DbModel.__eq__ = lambda self, other: self is other or (type(self) == type(other) and self.items() == other.items())

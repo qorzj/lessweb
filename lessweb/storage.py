@@ -37,5 +37,14 @@ class Storage(dict):
     def __repr__(self):
         return '<Storage ' + dict.__repr__(self) + '>'
 
+    def __sub__(self, other):
+        if isinstance(other, str):
+            if other in self:
+                del self[other]
+        else:
+            for key in other:
+                self.__sub__(key)
+        return self
+
 
 global_data = Storage()
