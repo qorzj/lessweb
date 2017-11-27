@@ -143,9 +143,16 @@ class Model:
     def setall(self, *mapping, **kwargs):
         if mapping:
             self.setall(**mapping[0])
+        type_dict = {k: anno for k, anno, _ in get_model_parameters(type(self))}
         for k, v in kwargs.items():
             if k[0] != '_':
-                setattr(self, k, v)
+                try:
+                    if k in type_dict and issubclass(type_dict[k], DefaultEnum):
+                        setattr(self, k, type_dict[k](v))
+                    else:
+                        setattr(self, k, v)
+                except AttributeError:  # property without setter
+                    pass
 
     def copy(self, *mapping, **kwargs):
         ret = self.__class__()

@@ -9,7 +9,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from ..storage import global_data, Storage
 from ..model import Model
 
-__all__ = ["DbModel", "init", "processor", "create_all", "make_session"]
+__all__ = ["DbModel", "init", "processor", "create_all", "make_session", "will_commit", "dumpall"]
 
 
 def _db_model_storage(self):
@@ -18,7 +18,7 @@ def _db_model_storage(self):
 
 def _db_model_setall(self, *mapping, **kwargs):
     if mapping:
-        _db_model_setall(**mapping[0])
+        _db_model_setall(self, **mapping[0])
     for k, v in kwargs.items():
         if k[0] != '_':
             setattr(self, k, v)
@@ -41,6 +41,14 @@ DbModel.__eq__ = lambda self, other: self is other or (type(self) == type(other)
 DbModel.__repr__ = lambda self: '<DbModel ' + repr(self.items()) + '>'
 
 
+class DumpAllDbModel:
+    def __ror__(self, other):
+        return [x.dump() for x in other]
+
+
+dumpall = DumpAllDbModel()
+
+
 def init(conf):
     if 'dburi' in conf:
         engine = create_engine(conf['dburi'])
@@ -52,6 +60,12 @@ def init(conf):
     engine.echo = conf.get('echo', conf['echo'])
     global_data.db_session_maker = sessionmaker(bind=engine)
     global_data.db_engine = engine
+
+
+def will_commit(ctx):
+    ret = ctx()
+    ctx.will_commit = True
+    return ret
 
 
 def processor(ctx):

@@ -284,11 +284,12 @@ class Application(object):
                     elif r is None:
                         yield b''
                     else:
+                        ctx.set_header('Content-Type', 'application/json')
                         yield self.serialize(r).encode(self.encoding)
 
             result = _2_build_result(result)
             status = '{0} {1}'.format(ctx.status_code, ctx.reason)
-            ctx.headers.setdefault('Content-Type', 'text/html')
+            ctx.headers.setdefault('Content-Type', 'text/html; charset=' + self.encoding)
             headers = list(ctx.headers.items())
             start_resp(status, headers)
             return itertools.chain(result, (b'',))
