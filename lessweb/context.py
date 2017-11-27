@@ -13,7 +13,7 @@ from urllib.parse import unquote, quote
 from io import BytesIO
 
 from lessweb.sugar import *
-from lessweb.storage import Storage, global_data
+from lessweb.storage import Storage
 from lessweb.webapi import UploadedFile, HttpError, mimetypes, hop_by_hop_headers
 
 
@@ -48,11 +48,12 @@ class Context(object):
         * query – an empty string if there are no query arguments otherwise a ? followed by the query string. E.g. ?fourlegs=good&twolegs=bad
         * fullpath a.k.a. path + query – the path requested including query arguments but not including homepath. E.g. /articles/845?fourlegs=good&twolegs=bad
     """
-    def __init__(self):
+    def __init__(self, app=None):
         self.status_code: int = 200
         self.reason: str = 'OK'
         self.headers: Dict = {}
         self.app_stack: List = []
+        self.app = app
 
         self.url_input: Dict = {}
         self.json_input: Optional[Dict] = None
@@ -73,10 +74,6 @@ class Context(object):
         self.path: str = ''
         self.query: str = ''
         self.fullpath: str = ''
-
-        self.me: Any = None
-        self.db: Any = None
-        self.will_commit: bool = False
 
     def __call__(self):
         return self.app_stack[-1](self)
@@ -111,7 +108,7 @@ class Context(object):
             return self._fields
         if self.is_json_request():
             try:
-                self.json_input = json.loads(self.data().decode(global_data.app.encoding))
+                self.json_input = json.loads(self.data().decode(self.app.encoding))
             except:
                 self.json_input = {'__error__': 'invalid json received'}
             return self.json_input

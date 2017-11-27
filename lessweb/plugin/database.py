@@ -1,15 +1,30 @@
 import time
+from typing import Any
 
 from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm.session import Session
 from sqlalchemy.exc import InterfaceError
 from sqlalchemy.ext.declarative import declarative_base
 
-from ..storage import global_data, Storage
-from ..model import Model
+from ..context import Context
+from ..storage import Storage
+from ..model import Model, DefaultEnum
 
-__all__ = ["DbModel", "init", "processor", "create_all", "make_session", "will_commit", "dumpall"]
+__all__ = ["global_data", "DbModel", "init", "processor", "create_all", "make_session", "will_commit", "dumpall"]
+
+
+class GlobalData:
+    db_session_maker: Any
+    db_engine: Any
+
+
+class DatabaseCtx(Context):
+    db : Session
+    will_commit: bool
+
+global_data = GlobalData()
 
 
 def _db_model_storage(self):
@@ -21,7 +36,10 @@ def _db_model_setall(self, *mapping, **kwargs):
         _db_model_setall(self, **mapping[0])
     for k, v in kwargs.items():
         if k[0] != '_':
-            setattr(self, k, v)
+            if isinstance(v, DefaultEnum):
+                setattr(self, k, v.value)
+            else:
+                setattr(self, k, v)
 
 
 def _db_model_copy(self, *mapping, **kwargs):
@@ -62,13 +80,13 @@ def init(conf):
     global_data.db_engine = engine
 
 
-def will_commit(ctx):
+def will_commit(ctx: DatabaseCtx):
     ret = ctx()
     ctx.will_commit = True
     return ret
 
 
-def processor(ctx):
+def processor(ctx: DatabaseCtx):
     try:
         ctx.db = global_data.db_session_maker()
         ctx.will_commit = False

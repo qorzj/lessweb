@@ -46,5 +46,3 @@ class Storage(dict):
                 self.__sub__(key)
         return self
 
-
-global_data = Storage()

@@ -13,11 +13,10 @@ from lessweb.webapi import HttpError
 from lessweb.sugar import *
 from lessweb.context import Context
 from lessweb.model import fetch_param
-from lessweb.storage import global_data
 
 
 __all__ = [
-    "ModelView", "Interceptor", "Mapping", "Serializer", "interceptor", "Application",
+    "global_data", "ModelView", "Interceptor", "Mapping", "Serializer", "interceptor", "Application",
 ]
 
 
@@ -121,10 +120,9 @@ class Application(object):
         self.serializers = []
         self.encoding: str = encoding
         self.debug: bool = debug
-        global_data.app = self
 
     def _load(self, env):
-        ctx = Context()
+        ctx = Context(self)
         ctx.environ = ctx.env = env
         ctx.host = env.get('HTTP_HOST')
         if env.get('wsgi.url_scheme') in ['http', 'https']:
