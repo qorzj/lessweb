@@ -48,7 +48,7 @@ class Context(object):
         * query – an empty string if there are no query arguments otherwise a ? followed by the query string. E.g. ?fourlegs=good&twolegs=bad
         * fullpath a.k.a. path + query – the path requested including query arguments but not including homepath. E.g. /articles/845?fourlegs=good&twolegs=bad
     """
-    def __init__(self, app=None):
+    def __init__(self, app=None) -> None:
         self.status_code: int = 200
         self.reason: str = 'OK'
         self.headers: Dict = {}

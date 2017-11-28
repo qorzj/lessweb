@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, overload
 
 from contextlib import contextmanager
 from sqlalchemy import create_engine
@@ -67,15 +67,23 @@ class DumpAllDbModel:
 dumpall = DumpAllDbModel()
 
 
-def init(conf):
-    if 'dburi' in conf:
-        engine = create_engine(conf['dburi'])
+@overload
+def init(*, dburi, echo: bool=True): ...
+@overload
+def init(*, protocol, username, password, host, port:int, entity, echo:bool=True): ...
+
+def init(*, protocol=None, username=None, password=None, host=None, port:int=None, entity=None, dburi=None, echo:bool=True):
+    if dburi:
+        engine = create_engine(dburi)
     else:
         engine = create_engine(
-            '{protocol}://{username}:{password}@{host}:{port}/{entity}'.format(**conf),
+            '{protocol}://{username}:{password}@{host}:{port}/{entity}'.format(
+                protocol=protocol, username=username, password=password,
+                host=host, port=port, entity=entity
+            ),
             pool_recycle=3600
         )
-    engine.echo = conf.get('echo', conf['echo'])
+    engine.echo = echo
     global_data.db_session_maker = sessionmaker(bind=engine)
     global_data.db_engine = engine
 
