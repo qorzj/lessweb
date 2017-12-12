@@ -10,7 +10,7 @@ from lessweb.storage import Storage
 
 
 class RestParam:
-    def __init__(self, getter=str, jsongetter=None, default=None, queryname=None, doc=''):
+    def __init__(self, getter=str, jsongetter=None, default=None, queryname=None, doc='') -> None:
         self.getter: Callable = getter  # 用于从str获取值
         self.jsongetter: Optional[Callable] = jsongetter  # 用于从json获取值
         self.default: Any = default
@@ -143,14 +143,10 @@ class Model:
     def setall(self, *mapping, **kwargs):
         if mapping:
             self.setall(**mapping[0])
-        type_dict = {k: anno for k, anno, _ in get_model_parameters(type(self))}
         for k, v in kwargs.items():
             if k[0] != '_':
                 try:
-                    if k in type_dict and issubclass(type_dict[k], DefaultEnum):
-                        setattr(self, k, type_dict[k](v))
-                    else:
-                        setattr(self, k, v)
+                    setattr(self, k, v)
                 except AttributeError:  # property without setter
                     pass
 

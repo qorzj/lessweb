@@ -1,5 +1,5 @@
 from typing import Any
-from redis import Redis, Connection
+from redis import Redis, ConnectionPool
 
 from ..context import Context
 
@@ -16,8 +16,9 @@ class RedisCtx(Context):
 
 
 def init(host, port, db=0):
-    global_data.redis_pool = Connection(host=host, port=port, db=db)
+    global_data.redis_pool = ConnectionPool(host=host, port=port, db=db)
 
 
 def processor(ctx: RedisCtx):
     ctx.redis = Redis(connection_pool=global_data.redis_pool)
+    return ctx()

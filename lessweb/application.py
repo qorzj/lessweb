@@ -3,16 +3,20 @@ Web application
 (from salar.py)
 """
 from typing import NamedTuple, Any, Callable, Optional, overload, Dict, List, Tuple
+from datetime import datetime
 import itertools
 import json
 import os
+import sys
 import re
+import logging
 from types import GeneratorType
+from enum import Enum as DefaultEnum
 
-from lessweb.webapi import HttpError
+from lessweb.webapi import HttpError, NeedParamError, BadParamError
 from lessweb.sugar import *
 from lessweb.context import Context
-from lessweb.model import fetch_param
+from lessweb.model import fetch_param, Model
 
 
 __all__ = [
@@ -28,7 +32,7 @@ class ModelView(NamedTuple):
 # ctx.interceptors: List[Interceptor]
 class Interceptor:
     """Interceptor to定义拦截器based on path prefix"""
-    def __init__(self, prefix, method, hook, excludes):
+    def __init__(self, prefix, method, hook, excludes) -> None:
         self.prefix: str = prefix
         self.method: str = method
         self.hook: Callable = hook
@@ -38,7 +42,7 @@ class Interceptor:
 # ctx.mapping: List[Mapping]
 class Mapping:
     """Mapping to定义请求处理者和path的对应关系"""
-    def __init__(self, pattern, method, hook, doc, patternobj):
+    def __init__(self, pattern, method, hook, doc, patternobj) -> None:
         self.pattern: str = pattern
         self.method: str = method
         self.hook: Callable = hook
@@ -114,7 +118,7 @@ class Application(object):
         app.run(port=8080)
 
     """
-    def __init__(self, encoding='utf-8', debug=True):
+    def __init__(self, encoding='utf-8', debug=True) -> None:
         self.mapping = []
         self.interceptors = []
         self.serializers = []
@@ -170,6 +174,11 @@ class Application(object):
         except HttpError as e:
             e.update(ctx)
             return e.text
+        except (NeedParamError, BadParamError) as e:
+            ctx.status_code = 400
+            ctx.reason = 'Bad Request'
+            ctx.headers.clear()
+            return str(e)
 
     def add_interceptor(self, hook, prefix='/', method='*', excludes=('/static/',)):
         """
@@ -177,8 +186,8 @@ class Application(object):
 
             from salar import Application
             app = Application()
-            app.add_interceptor('/', '*', lambda ctx: ctx() + ' world!')
-            app.add_mapping('/hello', lambda ctx: 'Hello')
+            app.add_interceptor(lambda ctx: ctx() + ' world!')
+            app.add_mapping('/hello', 'GET', lambda ctx: 'Hello')
             app.run()
         """
         self.interceptors.insert(0, Interceptor(prefix, method, hook, excludes))
@@ -213,6 +222,9 @@ class Application(object):
             app.add_serializer(varclass=datetime, func=lambda x: x.strftime('%H:%M:%S'))
             app.add_mapping('/now', 'GET', lambda ctx: {'time': datetime.now()})
             app.run()
+
+        Column and Data Types — SQLAlchemy
+            http://docs.sqlalchemy.org/en/latest/core/type_basics.html
         """
         assert isinstance(varclass, type) or \
                (isinstance(varclass, tuple) and all(isinstance(x, type) for x in varclass)), \
@@ -235,7 +247,15 @@ class Application(object):
                 for f in serializers:
                     if isinstance(obj, f.varclass):
                         return f.func(obj)
-                return json.JSONEncoder.default(self, obj)
+
+                if isinstance(obj, datetime):
+                    return obj.strftime('%Y-%m-%d %H:%M:%S')
+                elif isinstance(obj, Model):
+                    return obj.storage()
+                elif isinstance(obj, DefaultEnum):
+                    return obj.value
+                else:
+                    return json.JSONEncoder.default(self, obj)
 
         return json.dumps(obj, cls=_1_Encoder)
 
@@ -268,10 +288,12 @@ class Application(object):
                 _ = self._handle_with_hooks(ctx)
                 result = _1_peep(_) if isinstance(_, GeneratorType) else (_,)
             except Exception as e:
-                import logging
                 logging.exception(e)
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                exc_text = '%s %s: %s' % (fname, exc_tb.tb_lineno, str(e))
                 ctx.status_code, ctx.reason = 500, 'Internal Server Error'
-                result = (str(e),)
+                result = (exc_text,)
 
             def _2_build_result(result):
                 for r in result:

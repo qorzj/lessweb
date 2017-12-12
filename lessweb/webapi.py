@@ -98,9 +98,14 @@ class NeedParamError(Exception):
         self.query: str = query
         self.doc: str = doc
 
+    def __repr__(self):
+        return 'lessweb.NeedParamError query:%s doc:%s' % (self.query, self.doc)
+
 
 class BadParamError(Exception):
     def __init__(self, query, error):
         self.query: str = query
         self.error: str = error
 
+    def __repr__(self):
+        return 'lessweb.BadParamError query:%s error:%s' % (self.query, self.error)
