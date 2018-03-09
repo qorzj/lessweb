@@ -1,6 +1,6 @@
 """
 Web application
-(from salar.py)
+(from lessweb)
 """
 from typing import NamedTuple, Any, Callable, Optional, overload, Dict, List, Tuple
 from datetime import datetime
@@ -12,11 +12,17 @@ import re
 import logging
 from types import GeneratorType
 from enum import Enum as DefaultEnum
+from urllib.parse import splitquery, urlencode
+from io import BytesIO
+from contextlib import contextmanager
+import traceback
 
 from lessweb.webapi import HttpError, NeedParamError, BadParamError
 from lessweb.sugar import *
 from lessweb.context import Context
 from lessweb.model import fetch_param, Model
+from lessweb.storage import Storage
+from lessweb.utils import eafp
 
 
 __all__ = [
@@ -69,9 +75,9 @@ def build_controller(hook):
         >>> ret = build_controller(controller)(ctx)
         >>> assert ret == {'ctx': ctx, 'id': 5, 'lpn': 'HK888'}, ret
     """
-    def _1_controller(ctx):
+    def _1_controller(ctx:Context):
         params = fetch_param(ctx, hook)
-        return hook(ctx, **params)
+        return hook(**params)
 
     return _1_controller
 
@@ -94,10 +100,10 @@ def interceptor(hook):
         >>> assert list(ret) == ['ctx', 'id', 'lpn'], ret
     """
     def _1_wrapper(fn):
-        def _1_1_controller(ctx):
+        def _1_1_controller(ctx:Context):
             ctx.app_stack.append(build_controller(fn))
             params = fetch_param(ctx, hook)
-            result = hook(ctx, **params)
+            result = hook(**params)
             ctx.app_stack.pop()  # 有多次调用ctx()的可能性，比如批量删除
             return result
 
@@ -112,7 +118,7 @@ class Application(object):
 
     Example:
 
-        from salar import Application
+        from lessweb import Application
         app = Application()
         app.add_mapping('/hello', lambda ctx: 'Hello!')
         app.run(port=8080)
@@ -128,14 +134,14 @@ class Application(object):
     def _load(self, env):
         ctx = Context(self)
         ctx.environ = ctx.env = env
-        ctx.host = env.get('HTTP_HOST')
+        ctx.host = env.get('HTTP_HOST', '[unknown]')
         if env.get('wsgi.url_scheme') in ['http', 'https']:
             ctx.protocol = env['wsgi.url_scheme']
         elif env.get('HTTPS', '').lower() in ['on', 'true', '1']:
             ctx.protocol = 'https'
         else:
             ctx.protocol = 'http'
-        ctx.homedomain = ctx.protocol + '://' + env.get('HTTP_HOST', '[unknown]')
+        ctx.homedomain = ctx.protocol + '://' + ctx.host
         ctx.homepath = os.environ.get('REAL_SCRIPT_NAME', env.get('SCRIPT_NAME', ''))
         ctx.home = ctx.homedomain + ctx.homepath
         # @@ home is changed when the request is handled to a sub-application.
@@ -184,7 +190,7 @@ class Application(object):
         """
         Example:
 
-            from salar import Application
+            from lessweb import Application
             app = Application()
             app.add_interceptor(lambda ctx: ctx() + ' world!')
             app.add_mapping('/hello', 'GET', lambda ctx: 'Hello')
@@ -196,7 +202,7 @@ class Application(object):
         """
         Example:
 
-            from salar import Application
+            from lessweb import Application
             def sayhello(ctx, name):
                 return 'Hello %s!' % name
             def sayage(ctx, age: int, name='Bob'):
@@ -217,7 +223,7 @@ class Application(object):
         Example:
 
             from datetime import datetime
-            from salar import Application
+            from lessweb import Application
             app = Application()
             app.add_serializer(varclass=datetime, func=lambda x: x.strftime('%H:%M:%S'))
             app.add_mapping('/now', 'GET', lambda ctx: {'time': datetime.now()})
@@ -263,8 +269,8 @@ class Application(object):
         """
             Example:
 
-                import salar
-                app = salar.Application()
+                import lessweb
+                app = lessweb.Application()
                 app.add_interceptor('/', '*', lambda ctx: ctx() + ' world!')
                 app.add_mapping('/hello', lambda ctx: 'Hello')
                 application = app.wsgifunc()
@@ -289,11 +295,8 @@ class Application(object):
                 result = _1_peep(_) if isinstance(_, GeneratorType) else (_,)
             except Exception as e:
                 logging.exception(e)
-                exc_type, exc_obj, exc_tb = sys.exc_info()
-                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                exc_text = '%s %s: %s' % (fname, exc_tb.tb_lineno, str(e))
                 ctx.status_code, ctx.reason = 500, 'Internal Server Error'
-                result = (exc_text,)
+                result = (traceback.format_exc(),)
 
             def _2_build_result(result):
                 for r in result:
@@ -319,11 +322,94 @@ class Application(object):
 
         return wsgi
 
+    def request(self, localpart='/', method='GET', data=None,
+                host="0.0.0.0:8080", headers=None, https=False, env=None):
+        path, maybe_query = splitquery(localpart)
+        query = maybe_query or ""
+        env = env or {}
+        env = dict(env, HTTP_HOST=host, REQUEST_METHOD=method, PATH_INFO=path, QUERY_STRING=query, HTTPS=str(https))
+        headers = headers or {}
+
+        for k, v in headers.items():
+            env['HTTP_' + k.upper().replace('-', '_')] = v
+
+        if 'HTTP_CONTENT_LENGTH' in env:
+            env['CONTENT_LENGTH'] = env.pop('HTTP_CONTENT_LENGTH')
+
+        if 'HTTP_CONTENT_TYPE' in env:
+            env['CONTENT_TYPE'] = env.pop('HTTP_CONTENT_TYPE')
+
+        if method in ["HEAD", "GET", "DELETE"]:
+            env['wsgi.input'] = BytesIO(query.encode('utf-8'))
+        else:
+            data = data or ''
+            if isinstance(data, dict):
+                q = urlencode(data)
+            else:
+                q = data
+            env['wsgi.input'] = BytesIO(q.encode('utf-8'))
+            if 'CONTENT_LENGTH' not in env:
+                # if not env.get('CONTENT_TYPE', '').lower().startswith('multipart/') and 'CONTENT_LENGTH' not in env:
+                env['CONTENT_LENGTH'] = len(q)
+
+        response = Storage()
+
+        def start_response(status, headers):
+            response.status_code = int(status.split()[0])
+            response.headers = dict(headers)
+            response.header_items = headers
+
+        data = self.wsgifunc()(env, start_response)
+        response.data = b"".join(data)
+        return response
+
+    @contextmanager
+    def _reqtest(self, localpart='/', method='GET', data=None, headers=None, status_code=200, parsejson=True, https=False, env=None):
+        response_obj = ()
+        try:
+            ret = self.request(localpart=localpart, method=method, data=data, headers=headers, https=https, env=env)
+            ret.text = ret.data.decode(self.encoding)
+            if parsejson:
+                response_obj = eafp(lambda : json.loads(ret.text), ret.text)
+            else:
+                response_obj = ret.text
+            assert ret.status_code == status_code, 'status_code: {}\ntext: {}\n'.format(ret.status_code, ret.text)
+            yield response_obj
+        except Exception as e:
+            logging.exception(e)
+            logging.fatal('req-url: %s\n' % localpart)
+            logging.fatal('req-data: %s\n' % json.dumps(data))
+            logging.fatal('req-headers: %s\n' % json.dumps(headers))
+            if response_obj != ():
+                logging.fatal('response: %s\n' % response_obj)
+            raise
+
+    def test_get(self, localpart='/', query=None, headers=None, status_code=200, parsejson=True, https=False, env=None):
+        if query:
+            localpart = localpart + '?' + urlencode(query)
+        return self._reqtest(localpart, 'GET', None, headers, status_code, parsejson, https, env)
+
+    def test_delete(self, localpart='/', query=None, headers=None, status_code=200, parsejson=True, https=False, env=None):
+        if query:
+            localpart = localpart + '?' + urlencode(query)
+        return self._reqtest(localpart, 'DELETE', None, headers, status_code, parsejson, https, env)
+
+    def test_head(self, localpart='/', query=None, headers=None, status_code=200, parsejson=True, https=False, env=None):
+        if query:
+            localpart = localpart + '?' + urlencode(query)
+        return self._reqtest(localpart, 'HEAD', None, headers, status_code, parsejson, https, env)
+
+    def test_post(self, localpart='/', data=None, headers=None, status_code=200, parsejson=True, https=False, env=None):
+        return self._reqtest(localpart, 'POST', data, headers, status_code, parsejson, https, env)
+
+    def test_put(self, localpart='/', data=None, headers=None, status_code=200, parsejson=True, https=False, env=None):
+        return self._reqtest(localpart, 'PUT', data, headers, status_code, parsejson, https, env)
+
     def run(self, wsgifunc=None, port: int=8080):
         """
         Example:
 
-            from salar import Application
+            from lessweb import Application
             app = Application()
             app.add_interceptor('/', '*', lambda ctx: ctx() + ' world!')
             app.add_mapping('/hello', lambda ctx: 'Hello')

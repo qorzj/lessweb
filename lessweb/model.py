@@ -256,9 +256,13 @@ def fetch_param(ctx: Context, fn):
     """
     restparam_tips = {k:v for k,v in get_tips(fn, 'rest-param')}
     result = {}
-    for key, anno, default in get_func_parameters(fn)[1:]:
+    for key, anno, default in get_func_parameters(fn):
         if key in ctx.pipe:
             result[key] = ctx.pipe[key]
+            continue
+
+        if isinstance(anno, type) and issubclass(anno, Context):
+            result[key] = ctx
             continue
 
         if isinstance(anno, type) and issubclass(anno, Model):
