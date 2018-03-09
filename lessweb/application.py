@@ -355,6 +355,7 @@ class Application(object):
         response = Storage()
 
         def start_response(status, headers):
+            response.status = status
             response.status_code = int(status.split()[0])
             response.headers = dict(headers)
             response.header_items = headers
