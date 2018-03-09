@@ -37,16 +37,30 @@ class Context(object):
     """
     Contextual variables:
         * environ a.k.a. env – a dictionary containing the standard WSGI environment variables
-        * home – the base path for the application, including any parts "consumed" by outer applications http://example.org/admin
-        * homedomain – ? (appears to be protocol + host) http://example.org
+        * home – the base path for the application, including any parts "consumed" by outer applications
+        * homedomain – ? (appears to be protocol + host)
         * homepath – The part of the path requested by the user which was trimmed off the current app. That is homepath + path = the path actually requested in HTTP by the user. E.g. /admin This seems to be derived during startup from the environment variable REAL_SCRIPT_NAME. It affects what web.url() will prepend to supplied urls. This in turn affects where web.seeother() will go, which might interact badly with your url rewriting scheme (e.g. mod_rewrite)
         * host – the hostname (domain) and (if not default) the port requested by the user. E.g. example.org, example.org:8080
         * ip – the IP address of the user. E.g. xxx.xxx.xxx.xxx
-        * method – the HTTP method used. E.g. GET
-        * path – the path requested by the user, relative to the current application. If you are using subapplications, any part of the url matched by the outer application will be trimmed off. E.g. you have a main app in code.py, and a subapplication called admin.py. In code.py, you point /admin to admin.app. In admin.py, you point /stories to a class called stories. Within stories, web.ctx.path will be /stories, not /admin/stories. E.g. /articles/845
+        * method – the HTTP method used. E.g. POST
+        * path – the path requested by the user, relative to the current application. If you are using subapplications, any part of the url matched by the outer application will be trimmed off. E.g. you have a main app in code.py, and a subapplication called admin.py. In code.py, you point /admin to admin.app. In admin.py, you point /stories to a class called stories. Within stories, web.ctx.path will be /stories, not /admin/stories.
         * protocol – the protocol used. E.g. https
-        * query – an empty string if there are no query arguments otherwise a ? followed by the query string. E.g. ?fourlegs=good&twolegs=bad
-        * fullpath a.k.a. path + query – the path requested including query arguments but not including homepath. E.g. /articles/845?fourlegs=good&twolegs=bad
+        * query – an empty string if there are no query arguments otherwise a ? followed by the query string.
+        * fullpath a.k.a. path + query – the path requested including query arguments but not including homepath.
+
+        e.g. GET http://localhost:8080/api/hello/echo?a=1&b=2
+            host => localhost:8080
+            protocol => http
+            homedomain => http://localhost:8080
+            homepath => /api
+            home,realhome => http://localhost:8080/api
+            ip => 127.0.0.1
+            method => GET
+            path => /hello/echo
+            query => a=1&b=2
+            fullpath => /hello/echo?a=1&b=2
+
+        lessweb use ctx.path in routing.
     """
     def __init__(self, app=None) -> None:
         self.status_code: int = 200

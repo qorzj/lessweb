@@ -405,7 +405,7 @@ class Application(object):
     def test_put(self, localpart='/', data=None, headers=None, status_code=200, parsejson=True, https=False, env=None):
         return self._reqtest(localpart, 'PUT', data, headers, status_code, parsejson, https, env)
 
-    def run(self, wsgifunc=None, port: int=8080):
+    def run(self, wsgifunc=None, port:int=8080, homepath=''):
         """
         Example:
 
@@ -413,12 +413,18 @@ class Application(object):
             app = Application()
             app.add_interceptor('/', '*', lambda ctx: ctx() + ' world!')
             app.add_mapping('/hello', lambda ctx: 'Hello')
-            app.run(port=80)
+            app.run(port=80, homepath='/api')
         """
         from aiohttp import web
         from aiohttp_wsgi import WSGIHandler
         app = web.Application()
         if wsgifunc is None:
             wsgifunc = self.wsgifunc()
-        app.router.add_route("*", "/{path_info:.*}", WSGIHandler(wsgifunc))
+
+        if homepath.endswith('/'):
+            homepath = homepath[:-1]
+        if homepath and homepath[0] != '/':
+            homepath = '/' + homepath
+
+        app.router.add_route("*", homepath + "/{path_info:.*}", WSGIHandler(wsgifunc))
         web.run_app(app, port=port)
