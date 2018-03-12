@@ -56,21 +56,6 @@ def rest_param(key, *, getter=str, jsongetter=None, default=None, queryname=None
     return key, RestParam(getter, jsongetter, default, queryname, doc)
 
 
-@tips('choose-param')
-def need_param(*keys):
-    return 'need', keys
-
-
-@tips('choose-param')
-def choose_param(*keys):
-    return 'choose', keys
-
-
-@tips('choose-param')
-def unchoose_param(*keys):
-    return 'unchoose', keys
-
-
 @tips('enum-show')
 def enum_show(mapping):
     return mapping
@@ -168,40 +153,40 @@ class Model:
 def input_by_choose(ctx: Context, fn, key, rest_param: RestParam):
     """
 
-        >>> @need_param('a', 'b')
-        ... @choose_param('c', 'd')
-        ... @unchoose_param('d', 'e')
-        ... def foo(a, b, c=0, d=1, e=2):
+        >>> def foo(a, b, c=0, d=1, e=2):
         ...     pass
         >>> ctx = Context()
         >>> ctx._fields = dict(a='A', b='B', c='C', d='D', e='E', f='F')
         >>> [input_by_choose(ctx, foo, k, RestParam()) for k in 'abcde']
         ['A', 'B', 'C', None, None]
     """
-    chooseparam_tips = {k:v for k,v in get_tips(fn, 'choose-param')}
     if ctx.is_json_request():
         getter = rest_param.jsongetter or rest_param.getter
     else:
         getter = rest_param.getter
     queryname = rest_param.queryname or key
-    value = ctx.get_input(queryname, default=_nil)
-    keys_will_choose = chooseparam_tips.get('choose', None)
-    if getter is None:
-        return rest_param.default
 
-    if key in chooseparam_tips.get('need', []):
-        if value is _nil:
-            raise NeedParamError(query=queryname, doc=rest_param.doc)
-    elif key in chooseparam_tips.get('unchoose', []) or \
-            (keys_will_choose is not None and key not in keys_will_choose):
-        return rest_param.default
+    if key in ctx.pipe:
+        value = ctx.pipe[key]
+    else:
+        pre_value = ctx.get_input(queryname, default=_nil)
+        try:
+            if getter is None:
+                value = rest_param.default
+            else:
+                if pre_value is not _nil:
+                    value = getter(pre_value)
+                else:
+                    value = _nil
+        except (ValueError, TypeError) as e:
+            raise BadParamError(query=queryname, error=str(e))
 
-    if value is _nil:
+    if value is _nil or value is None:
+        if rest_param.default is None:
+            raise NeedParamError(query=queryname, doc=queryname)
         return rest_param.default
-    try:
-        return getter(value)
-    except (ValueError, TypeError) as e:
-        raise BadParamError(query=queryname, error=str(e))
+    else:
+        return value
 
 
 def fetch_model_param(ctx: Context, cls, fn):
@@ -221,10 +206,6 @@ def fetch_model_param(ctx: Context, cls, fn):
     restparam_tips = {k:v for k,v in get_tips(cls, 'rest-param')}
     result = {}
     for key, anno, default in get_model_parameters(cls):
-        if key in ctx.pipe:
-            result[key] = ctx.pipe[key]
-            continue
-
         if key in restparam_tips:
             param = restparam_tips[key]
         else:
@@ -257,10 +238,6 @@ def fetch_param(ctx: Context, fn):
     restparam_tips = {k:v for k,v in get_tips(fn, 'rest-param')}
     result = {}
     for key, anno, default in get_func_parameters(fn):
-        if key in ctx.pipe:
-            result[key] = ctx.pipe[key]
-            continue
-
         if isinstance(anno, type) and issubclass(anno, Context):
             result[key] = ctx
             continue

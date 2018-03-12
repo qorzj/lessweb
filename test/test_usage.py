@@ -1,7 +1,7 @@
 from unittest import TestCase
 from lessweb.application import Application, interceptor
 from lessweb.context import Context
-from lessweb.model import need_param
+from lessweb.model import rest_param
 
 
 def add1(a, b):
@@ -17,9 +17,14 @@ def wrapper(ctx:Context):
     return {'ans': value}
 
 
-@need_param('a', 'b')
-def add3(a:int=0, b:int=0):
+def add3(a='x', b='y'):
     return {'ans': a + b}
+
+
+def wrapper2(ctx:Context):
+    ctx.pipe['b'] = None
+    value = '[' + ctx()['ans'] + ']'
+    return {'ans': value}
 
 
 class TestUsage(TestCase):
@@ -57,8 +62,52 @@ class TestUsage(TestCase):
         with app.test_get('/add', {'a': 'a', 'b': 'b'}) as ret:
             self.assertEquals(ret, {'ans': '[/add:ab]'})
 
-    def test_tips(self):
+    def test_need_param(self):
         app = Application()
         app.add_mapping('/add', 'GET', add3)
-        with app.test_get('/add', {'a': 1, 'b': 0}) as ret:
-            self.assertEquals(ret, {'ans': 1})
+        with app.test_get('/add') as ret:
+            self.assertEquals(ret, {'ans': 'xy'})
+
+        app = Application()
+        app.add_mapping('/add', 'GET', add1)
+        with app.test_get('/add', status_code=400) as ret:
+            self.assertEquals(ret, 'lessweb.NeedParamError query:a doc:a')
+
+        app = Application()
+        f = rest_param('b', default='y')(add1)
+        app.add_mapping('/add', 'GET', f)
+        with app.test_get('/add', {'a': 'x'}) as ret:
+            self.assertEquals(ret, {'ans': 'xy'})
+
+        app = Application()
+        f = rest_param('b')(add1)
+        app.add_mapping('/add', 'GET', f)
+        with app.test_get('/add', {'a': 'x'}, status_code=400) as ret:
+            self.assertEquals(ret, 'lessweb.NeedParamError query:b doc:b')
+
+        app = Application()
+        app.add_mapping('/add', 'GET', add1)
+        with app.test_get('/add', {'a': '1', 'b': '2'}) as ret:
+            self.assertEquals(ret, {'ans': '12'})
+
+        app = Application()
+        f = rest_param('b', getter=None, default='y')(add3)
+        app.add_mapping('/add', 'GET', f)
+        with app.test_get('/add', {'a': 1, 'b': 2}) as ret:
+            self.assertEquals(ret, {'ans': '1y'})
+
+        app = Application()
+        f = rest_param('b', getter=None, default=None)(add1)
+        app.add_mapping('/add', 'GET', add1)
+        with app.test_get('/add', {'a': 1, 'b': 2}, status_code=400) as ret:
+            self.assertEquals(ret, 'lessweb.NeedParamError query:b doc:b')
+
+        app = Application()
+        app.add_mapping('/add', 'GET', interceptor(wrapper2)(add3))
+        with app.test_get('/add', {'a': 2, 'b': 3}) as ret:
+            self.assertEquals(ret, {'ans': '[2y]'})
+
+        app = Application()
+        app.add_mapping('/add', 'GET', interceptor(wrapper2)(add1))
+        with app.test_get('/add', {'a': 2, 'b': 3}, status_code=400) as ret:
+            self.assertEquals(ret, 'lessweb.NeedParamError query:b doc:b')
