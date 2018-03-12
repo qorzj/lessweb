@@ -101,6 +101,9 @@ class NeedParamError(Exception):
     def __repr__(self):
         return 'lessweb.NeedParamError query:%s doc:%s' % (self.query, self.doc)
 
+    def __str__(self):
+        return 'query:%s doc:%s' % (self.query, self.doc)
+
 
 class BadParamError(Exception):
     def __init__(self, query, error):
@@ -109,3 +112,6 @@ class BadParamError(Exception):
 
     def __repr__(self):
         return 'lessweb.BadParamError query:%s error:%s' % (self.query, self.error)
+
+    def __str__(self):
+        return 'query:%s doc:%s' % (self.query, self.doc)

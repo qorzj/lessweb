@@ -184,7 +184,7 @@ class Application(object):
             ctx.status_code = 400
             ctx.reason = 'Bad Request'
             ctx.headers.clear()
-            return str(e)
+            return repr(e)
 
     def add_interceptor(self, hook, prefix='/', method='*', excludes=('/static/',)):
         """

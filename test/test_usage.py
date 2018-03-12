@@ -1,6 +1,7 @@
 from unittest import TestCase
 from lessweb.application import Application, interceptor
 from lessweb.context import Context
+from lessweb.model import need_param
 
 
 def add1(a, b):
@@ -14,6 +15,11 @@ def add2(ctx:Context, a, b):
 def wrapper(ctx:Context):
     value = '[' + ctx()['ans'] + ']'
     return {'ans': value}
+
+
+@need_param('a', 'b')
+def add3(a:int=0, b:int=0):
+    return {'ans': a + b}
 
 
 class TestUsage(TestCase):
@@ -50,3 +56,9 @@ class TestUsage(TestCase):
         app.add_mapping('/add', 'GET', interceptor(wrapper)(add2))
         with app.test_get('/add', {'a': 'a', 'b': 'b'}) as ret:
             self.assertEquals(ret, {'ans': '[/add:ab]'})
+
+    def test_tips(self):
+        app = Application()
+        app.add_mapping('/add', 'GET', add3)
+        with app.test_get('/add', {'a': 1, 'b': 0}) as ret:
+            self.assertEquals(ret, {'ans': 1})
