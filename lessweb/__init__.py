@@ -18,4 +18,4 @@ from .model import rest_param, tips, get_tips, get_annotations
 from .model import get_func_parameters, get_model_parameters, Model
 from .model import enum_show, Enum
 from .storage import Storage
-from .webapi import HttpError, BadRequestError, NeedParamError, BadParamError
+from .webapi import HttpError, BadRequest, NeedParamError, BadParamError

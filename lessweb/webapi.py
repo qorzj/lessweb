@@ -46,53 +46,122 @@ class UploadedFile:
         self.value = upfile.value
 
 
+# HTTPError and subclasses
 class HttpError(Exception):
-    def __init__(self, status_code, text, headers=None):
+    def __init__(self, *, status_code, text, headers=None):
         self.status_code: int = status_code
         self.text: str = text
         self.headers = headers or {}
 
-    def update(self, ctx):
-        ctx.status_code = self.status_code
-        ctx.reason = status_dict.get(ctx.status_code, 'Unknown')
-        ctx.headers = self.headers
+
+class _Redirect(HttpError):
+    def __init__(self, status_code, fullurl, headers):
+        super().__init__(
+            status_code=status_code,
+            text='',
+            headers=dict(
+                headers,
+                **{'Content-Type': 'text/html', 'Location': fullurl},
+            )
+        )
 
 
-class BadRequestError(HttpError):
-    def __init__(self, text):
-        super().__init__(400, text)
+class Found(_Redirect):
+    def __init__(self, url, headers=None):
+        headers = headers or {}
+        super().__init__(status_code=302, fullurl=url, headers=headers)
 
 
-class SeeOther(HttpError):
-    def __init__(self, url):
-        self.status_code: int = 303
-        self.url = url
-        self.text = ''
-
-    def update(self, ctx):
-        ctx.status_code = self.status_code
-        ctx.reason = status_dict.get(ctx.status_code)
-        ctx.headers = {
-            'Content-Type': 'text/html',
-            'Location': ctx.realhome + self.url,
-        }
+class SeeOther(_Redirect):
+    def __init__(self, url, headers=None):
+        headers = headers or {}
+        super().__init__(status_code=303, fullurl=url, headers=headers)
 
 
 class NotModified(HttpError):
     def __init__(self):
-        super().__init__(304, '')
+        super().__init__(status_code=304, text='')
 
 
-class Unauthorized(HttpError):
-    def __init__(self, text='unauthorized'):
-        super().__init__(401, text=text, headers={'Content-Type': 'text/html'})
+class TempRedirect(_Redirect):
+    def __init__(self, url, headers=None):
+        super().__init__(status_code=307, fullurl=url, headers=headers)
 
 
-class Forbidden(HttpError):
-    def __init__(self, text="forbidden"):
-        super().__init__(403, text, headers={'Content-Type': 'text/html'})
+class _TextHttpError(HttpError):
+    def __init__(self, status_code, text, headers):
+        headers = headers or {}
+        headers = dict(headers, **{'Content-Type': 'text/html'})
+        super().__init__(status_code=status_code, text=text, headers=headers)
 
 
+class BadRequest(_TextHttpError):
+    def __init__(self, text, headers=None):
+        super().__init__(status_code=400, text=text, headers=headers)
+
+
+class Unauthorized(_TextHttpError):
+    def __init__(self, text='unauthorized', headers=None):
+        super().__init__(status_code=401, text=text, headers=headers)
+
+
+class Forbidden(_TextHttpError):
+    def __init__(self, text="forbidden", headers=None):
+        super().__init__(status_code=403, text=text, headers=headers)
+
+
+class NotFound(HttpError):
+    def __init__(self, text, headers=None):
+        headers = headers or {}
+        if not headers:
+            headers = {'Content-Type': 'text/html'}
+        super().__init__(status_code=404, text=text, headers=headers)
+
+
+class NoMethod(_TextHttpError):
+    def __init__(self, text='', methods=None and ['GET', ...], headers=None):
+        headers = headers or {}
+        if methods:
+            headers = dict(headers, Allow=', '.join(methods))
+        super().__init__(status_code=405, text=text, headers=headers)
+
+
+class NotAcceptable(_TextHttpError):
+    def __init__(self, text='not acceptable', headers=None):
+        super().__init__(status_code=406, text=text, headers=headers)
+
+
+class Conflict(_TextHttpError):
+    def __init__(self, text='conflict', headers=None):
+        super().__init__(status_code=409, text=text, headers=headers)
+
+
+class Gone(_TextHttpError):
+    def __init__(self, text='gone', headers=None):
+        super().__init__(status_code=410, text=text, headers=headers)
+
+
+class PreconditionFailed(_TextHttpError):
+    def __init__(self, text='precondition failed', headers=None):
+        super().__init__(status_code=412, text=text, headers=headers)
+
+
+class UnsupportedMediaType(_TextHttpError):
+    def __init__(self, text='unsupported media type', headers=None):
+        super().__init__(status_code=415, text=text, headers=headers)
+
+
+class UnavailableForLegalReasons(_TextHttpError):
+    def __init__(self, text='unavailable for legal reasons', headers=None):
+        super().__init__(status_code=451, text=text, headers=headers)
+
+
+class InternalError(_TextHttpError):
+    def __init__(self, text='internal server error', headers=None):
+        super().__init__(status_code=500, text=text, headers=headers)
+
+
+# lessweb framework exceptions
 class NeedParamError(Exception):
     def __init__(self, query, doc):
         self.query: str = query
@@ -114,4 +183,4 @@ class BadParamError(Exception):
         return 'lessweb.BadParamError query:%s error:%s' % (self.query, self.error)
 
     def __str__(self):
-        return 'query:%s doc:%s' % (self.query, self.doc)
+        return 'query:%s error:%s' % (self.query, self.error)
