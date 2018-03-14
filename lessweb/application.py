@@ -48,12 +48,14 @@ class Interceptor:
 # ctx.mapping: List[Mapping]
 class Mapping:
     """Mapping to定义请求处理者和path的对应关系"""
-    def __init__(self, pattern, method, hook, doc, patternobj) -> None:
+    def __init__(self, pattern, method, hook, doc, patternobj, view, querynames) -> None:
         self.pattern: str = pattern
         self.method: str = method
         self.hook: Callable = hook
         self.doc: str = doc
         self.patternobj: Any = patternobj
+        self.view = view
+        self.querynames = querynames
 
 
 # ctx.serializers: List[Serializer]
@@ -167,6 +169,13 @@ class Application(object):
                 _ = mapping.patternobj.search(ctx.path)
                 if _ and (mapping.method == ctx.method or mapping.method == '*'):
                     ctx.url_input = _.groupdict()
+                    ctx.view = mapping.view
+                    if mapping.querynames == '*':
+                        ctx.querynames = None
+                    elif isinstance(mapping.querynames, str):
+                        ctx.querynames = mapping.querynames.replace(',', ' ').split()
+                    else:
+                        ctx.querynames = mapping.querynames
                     return mapping.hook
             raise HttpError(status_code=404, text='Not Found', headers={})
 
@@ -178,12 +187,11 @@ class Application(object):
                     f = interceptor(itr.hook)(f)
             return f(ctx)
         except HttpError as e:
-            e.update(ctx)
             return e.text
         except (NeedParamError, BadParamError) as e:
             ctx.status_code = 400
             ctx.reason = 'Bad Request'
-            ctx.headers.clear()
+            ctx.headers = {'Content-Type': 'text/html'}
             return repr(e)
 
     def add_interceptor(self, hook, prefix='/', method='*', excludes=('/static/',)):
@@ -198,7 +206,7 @@ class Application(object):
         """
         self.interceptors.insert(0, Interceptor(prefix, method, hook, excludes))
 
-    def add_mapping(self, pattern, method, hook, doc=''):
+    def add_mapping(self, pattern, method, hook, doc='', view=None, querynames='*'):
         """
         Example:
 
@@ -216,7 +224,7 @@ class Application(object):
         patternobj = re.compile('^' + pattern + '$')
         if _is(ModelView)(hook):
             hook = hook.controller
-        self.mapping.append(Mapping(pattern, method, hook, doc, patternobj))
+        self.mapping.append(Mapping(pattern, method, hook, doc, patternobj, view, querynames))
 
     def add_serializer(self, varclass, func):
         """
@@ -339,9 +347,7 @@ class Application(object):
         if 'HTTP_CONTENT_TYPE' in env:
             env['CONTENT_TYPE'] = env.pop('HTTP_CONTENT_TYPE')
 
-        if method in ["HEAD", "GET", "DELETE"]:
-            env['wsgi.input'] = BytesIO(query.encode('utf-8'))
-        else:
+        if method not in ["HEAD", "GET", "DELETE"]:
             data = data or ''
             if isinstance(data, dict):
                 q = urlencode(data)

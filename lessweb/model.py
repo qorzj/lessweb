@@ -2,9 +2,10 @@ from enum import Enum as DefaultEnum
 import inspect
 from inspect import _empty
 from typing import *
+import functools
 
 from lessweb.context import Context
-from lessweb.sugar import _nil
+from lessweb.utils import _nil
 from lessweb.webapi import NeedParamError, BadParamError
 from lessweb.storage import Storage
 
@@ -33,11 +34,15 @@ def tips(slot: str):
         def f(*a, **b):
             tip_value = fn(*a, **b)
             def h(foo):
-                if not hasattr(foo, '__tips__'):
-                    foo.__tips__ = {}
-                foo.__tips__.setdefault(slot, [])
-                foo.__tips__[slot].append(tip_value)
-                return foo
+                @functools.wraps(foo)
+                def goo(*p, **q):
+                    return foo(*p, **q)
+
+                if not hasattr(goo, '__tips__'):
+                    goo.__tips__ = {}
+                goo.__tips__.setdefault(slot, [])
+                goo.__tips__[slot].append(tip_value)
+                return goo
             return h
         return f
     return g

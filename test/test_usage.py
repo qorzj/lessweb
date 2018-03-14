@@ -27,6 +27,10 @@ def wrapper2(ctx:Context):
     return {'ans': value}
 
 
+def wrapper3(ctx:Context):
+    return ctx.view.format(ctx()['ans'])
+
+
 class TestUsage(TestCase):
     # if argument didn't annotate Context type, then do not inject ctx value
     def test_fetch_param(self):
@@ -98,7 +102,7 @@ class TestUsage(TestCase):
 
         app = Application()
         f = rest_param('b', getter=None, default=None)(add1)
-        app.add_mapping('/add', 'GET', add1)
+        app.add_mapping('/add', 'GET', f)
         with app.test_get('/add', {'a': 1, 'b': 2}, status_code=400) as ret:
             self.assertEquals(ret, 'lessweb.NeedParamError query:b doc:b')
 
@@ -111,3 +115,24 @@ class TestUsage(TestCase):
         app.add_mapping('/add', 'GET', interceptor(wrapper2)(add1))
         with app.test_get('/add', {'a': 2, 'b': 3}, status_code=400) as ret:
             self.assertEquals(ret, 'lessweb.NeedParamError query:b doc:b')
+
+        app = Application()
+        app.add_mapping('/add', 'GET', add3)
+        with app.test_get('/add', {'a': 2, 'b': 3}) as ret:
+            self.assertEquals(ret, {'ans': '23'})
+
+        app = Application()
+        app.add_mapping('/add', 'GET', add3, querynames='b')
+        with app.test_get('/add', {'a': 2, 'b': 3}) as ret:
+            self.assertEquals(ret, {'ans': 'x3'})
+
+        app = Application()
+        app.add_mapping('/add', 'GET', add1, querynames='b')
+        with app.test_get('/add', {'a': 2, 'b': 3}, status_code=400) as ret:
+            self.assertEquals(ret, 'lessweb.NeedParamError query:a doc:a')
+
+    def test_view(self):
+        app = Application()
+        app.add_mapping('/add', 'GET', interceptor(wrapper3)(add3), view='sum={}')
+        with app.test_get('/add') as ret:
+            self.assertEquals(ret, 'sum=xy')

@@ -12,9 +12,9 @@ from urllib.parse import unquote, quote
 
 from io import BytesIO
 
-from lessweb.sugar import *
 from lessweb.storage import Storage
 from lessweb.webapi import UploadedFile, HttpError, mimetypes, hop_by_hop_headers
+from lessweb.utils import _nil
 
 
 def _process_fieldstorage(fs):
@@ -68,6 +68,8 @@ class Context(object):
         self.headers: Dict = {}
         self.app_stack: List = []
         self.app = app
+        self.view = None
+        self.querynames = None
 
         self.url_input: Dict = {}
         self.json_input: Optional[Dict] = None
@@ -127,10 +129,13 @@ class Context(object):
                 self.json_input = {'__error__': 'invalid json received'}
             return self.json_input
         else:
-            fp = BytesIO(self.data())
             try:
                 # cgi.FieldStorage can raise exception when handle some input
-                _ = cgi.FieldStorage(fp=fp, environ=self.env.copy(), keep_blank_values=1)
+                if self.method in ['GET', 'HEAD', 'DELETE']:
+                    _ = cgi.FieldStorage(environ=self.env.copy(), keep_blank_values=1)
+                else:
+                    fp = BytesIO(self.data())
+                    _ = cgi.FieldStorage(fp=fp, environ=self.env.copy(), keep_blank_values=1)
                 self._fields = _dictify(_)
             except:
                 self._fields = {'__error__': 'invalid fields received'}
@@ -155,9 +160,13 @@ class Context(object):
         Example:
 
         """
+        if self.querynames is not None and queryname not in self.querynames:
+            return _nil
+
         ret = self.url_input.get(queryname, _nil)
         if ret is not _nil:
             return ret
+
         return self.field_input.get(queryname, default)
 
     def static_file(self, path, basepath='./static', max_age=900, enable_gzip=False):
