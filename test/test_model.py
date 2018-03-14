@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from lessweb.sugar import _nil
+from lessweb.utils import _nil
 from lessweb.model import RestParam, get_model_parameters, Model
 
 
