@@ -22,7 +22,7 @@ def add3(a='x', b='y'):
 
 
 def wrapper2(ctx:Context):
-    ctx.pipe['b'] = None
+    ctx.set_param('b', None)
     value = '[' + ctx()['ans'] + ']'
     return {'ans': value}
 

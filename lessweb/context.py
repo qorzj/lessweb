@@ -75,7 +75,7 @@ class Context(object):
         self.json_input: Optional[Dict] = None
         self._post_data: Optional[Dict] = None
         self._fields: Optional[Dict] = None
-        self.pipe: Storage = Storage()
+        self._pipe: Storage = Storage()
 
         self.environ: Dict = {}
         self.env: Dict = {}
@@ -93,6 +93,12 @@ class Context(object):
 
     def __call__(self):
         return self.app_stack[-1](self)
+
+    def set_param(self, realname, realvalue):
+        self._pipe[realname] = realvalue
+
+    def get_param(self, realname, default=None):
+        return self._pipe.get(realname, default)
 
     def set_header(self, header, value):
         """

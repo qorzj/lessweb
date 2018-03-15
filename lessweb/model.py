@@ -49,16 +49,16 @@ def tips(slot: str):
 
 
 @tips('rest-param')
-def rest_param(key, *, getter=str, jsongetter=None, default=None, queryname=None, doc=None):
+def rest_param(realname, *, getter=str, jsongetter=None, default=None, queryname=None, doc=None):
     """
     >>> @rest_param('x')
     ... def foo(x): pass
     >>> a: RestParam = foo.__tips__['rest-param']
     >>> assert (a.getter, a.jsongetter, a.default, a.queryname, a.doc) == (str, None, None, 'x', 'x')
     """
-    if doc is None: doc = key
-    if queryname is None: queryname = key
-    return key, RestParam(getter, jsongetter, default, queryname, doc)
+    if doc is None: doc = realname
+    if queryname is None: queryname = realname
+    return realname, RestParam(getter, jsongetter, default, queryname, doc)
 
 
 @tips('enum-show')
@@ -155,7 +155,7 @@ class Model:
         return '<Model ' + repr(dict(self.storage())) + '>'
 
 
-def input_by_choose(ctx: Context, fn, key, rest_param: RestParam):
+def input_by_choose(ctx: Context, fn, realname, rest_param: RestParam):
     """
 
         >>> def foo(a, b, c=0, d=1, e=2):
@@ -169,10 +169,10 @@ def input_by_choose(ctx: Context, fn, key, rest_param: RestParam):
         getter = rest_param.jsongetter or rest_param.getter
     else:
         getter = rest_param.getter
-    queryname = rest_param.queryname or key
+    queryname = rest_param.queryname or realname
 
-    if key in ctx.pipe:
-        value = ctx.pipe[key]
+    if realname in ctx._pipe:
+        value = ctx.get_param(realname)
     else:
         pre_value = ctx.get_input(queryname, default=_nil)
         try:
@@ -210,19 +210,19 @@ def fetch_model_param(ctx: Context, cls, fn):
     """
     restparam_tips = {k:v for k,v in get_tips(cls, 'rest-param')}
     result = {}
-    for key, anno, default in get_model_parameters(cls):
-        if key in restparam_tips:
-            param = restparam_tips[key]
+    for realname, anno, default in get_model_parameters(cls):
+        if realname in restparam_tips:
+            param = restparam_tips[realname]
         else:
             if anno is _nil: vartype = str
             elif anno is int: vartype = lambda x: max(int(x), 0)
             elif issubclass(anno, DefaultEnum): vartype = lambda x: anno(int(x))
             else: vartype = anno
             default = None if default is _nil else default
-            param = RestParam(getter=vartype, default=default, doc=key)
+            param = RestParam(getter=vartype, default=default, doc=realname)
 
-        value = input_by_choose(ctx, fn, key, param)
-        result[key] = value
+        value = input_by_choose(ctx, fn, realname, param)
+        result[realname] = value
     model = cls()
     model.setall(**result)
     return model
@@ -242,25 +242,25 @@ def fetch_param(ctx: Context, fn):
     """
     restparam_tips = {k:v for k,v in get_tips(fn, 'rest-param')}
     result = {}
-    for key, anno, default in get_func_parameters(fn):
+    for realname, anno, default in get_func_parameters(fn):
         if isinstance(anno, type) and issubclass(anno, Context):
-            result[key] = ctx
+            result[realname] = ctx
             continue
 
         if isinstance(anno, type) and issubclass(anno, Model):
-            result[key] = fetch_model_param(ctx, anno, fn)
+            result[realname] = fetch_model_param(ctx, anno, fn)
             continue
 
-        if key in restparam_tips:
-            param = restparam_tips[key]
+        if realname in restparam_tips:
+            param = restparam_tips[realname]
         else:
             if anno is _nil: vartype = str
             elif anno is int: vartype = lambda x: max(int(x), 0)
             elif issubclass(anno, DefaultEnum): vartype = lambda x: anno(int(x))
             else: vartype = anno
             default = None if default is _nil else default
-            param = RestParam(getter=vartype, default=default, doc=key)
+            param = RestParam(getter=vartype, default=default, doc=realname)
 
-        value = input_by_choose(ctx, fn, key, param)
-        result[key] = value
+        value = input_by_choose(ctx, fn, realname, param)
+        result[realname] = value
     return result
