@@ -1,7 +1,5 @@
 from unittest import TestCase
-from lessweb.application import Application, interceptor
-from lessweb.context import Context
-from lessweb.model import rest_param
+from lessweb import Application, interceptor, Context, rest_param
 
 
 def add1(a, b):

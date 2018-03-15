@@ -1,8 +1,8 @@
-from enum import Enum as DefaultEnum
 import inspect
+import functools
+from enum import Enum
 from inspect import _empty
 from typing import *
-import functools
 
 from lessweb.context import Context
 from lessweb.utils import _nil
@@ -59,28 +59,6 @@ def rest_param(realname, *, getter=str, jsongetter=None, default=None, queryname
     if doc is None: doc = realname
     if queryname is None: queryname = realname
     return realname, RestParam(getter, jsongetter, default, queryname, doc)
-
-
-@tips('enum-show')
-def enum_show(mapping):
-    return mapping
-
-
-class Enum(DefaultEnum):
-    """
-    >>> @enum_show({1: 'Red', 2: 'Green'})
-    ... class Color(Enum):
-    ...     R = 1
-    ...     G = 2
-    >>> assert Color.R.show() == 'Red'
-    >>> assert Color(2).show() == 'Green'
-    """
-    def show(self):
-        mapping = get_tips(self, 'enum-show')
-        if not mapping:
-            return self.name
-        else:
-            return mapping[0][self.value]
 
 
 def get_func_parameters(func):
@@ -216,7 +194,7 @@ def fetch_model_param(ctx: Context, cls, fn):
         else:
             if anno is _nil: vartype = str
             elif anno is int: vartype = lambda x: max(int(x), 0)
-            elif issubclass(anno, DefaultEnum): vartype = lambda x: anno(int(x))
+            elif issubclass(anno, Enum): vartype = lambda x: anno(int(x))
             else: vartype = anno
             default = None if default is _nil else default
             param = RestParam(getter=vartype, default=default, doc=realname)
@@ -256,7 +234,14 @@ def fetch_param(ctx: Context, fn):
         else:
             if anno is _nil: vartype = str
             elif anno is int: vartype = lambda x: max(int(x), 0)
-            elif issubclass(anno, DefaultEnum): vartype = lambda x: anno(int(x))
+            elif issubclass(anno, Enum):
+                def _enum_init(x, T=anno):
+                    for e in T.__members__.values():
+                        if str(e.value) == str(x):
+                            return e
+                    raise ValueError("%r is not a valid %s" % (x, T.__name__))
+
+                vartype = _enum_init
             else: vartype = anno
             default = None if default is _nil else default
             param = RestParam(getter=vartype, default=default, doc=realname)

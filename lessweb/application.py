@@ -2,31 +2,30 @@
 Web application
 (from lessweb)
 """
-from typing import NamedTuple, Any, Callable, Optional, overload, Dict, List, Tuple
 from datetime import datetime
 import itertools
 import json
-import os
-import sys
-import re
 import logging
+import os
+import re
+import traceback
 from types import GeneratorType
-from enum import Enum as DefaultEnum
+from typing import NamedTuple, Any, Callable, Tuple
+from enum import Enum
 from urllib.parse import splitquery, urlencode
 from io import BytesIO
 from contextlib import contextmanager
-import traceback
 
 from lessweb.webapi import HttpError, NeedParamError, BadParamError
 from lessweb.sugar import *
 from lessweb.context import Context
 from lessweb.model import fetch_param, Model
 from lessweb.storage import Storage
-from lessweb.utils import eafp
+from lessweb.utils import eafp, json_dumps
 
 
 __all__ = [
-    "global_data", "ModelView", "Interceptor", "Mapping", "Serializer", "interceptor", "Application",
+    "global_data", "ModelView", "Interceptor", "Mapping", "interceptor", "Application",
 ]
 
 
@@ -35,7 +34,7 @@ class ModelView(NamedTuple):
     controller: Callable
 
 
-# ctx.interceptors: List[Interceptor]
+# Application.interceptors: List[Interceptor]
 class Interceptor:
     """Interceptor to定义拦截器based on path prefix"""
     def __init__(self, prefix, method, hook, excludes) -> None:
@@ -45,7 +44,7 @@ class Interceptor:
         self.excludes: Tuple = excludes
 
 
-# ctx.mapping: List[Mapping]
+# Application.mapping: List[Mapping]
 class Mapping:
     """Mapping to定义请求处理者和path的对应关系"""
     def __init__(self, pattern, method, hook, doc, patternobj, view, querynames) -> None:
@@ -56,14 +55,6 @@ class Mapping:
         self.patternobj: Any = patternobj
         self.view = view
         self.querynames = querynames
-
-
-# ctx.serializers: List[Serializer]
-class Serializer:
-    """为非基础类型指定Serializer"""
-    def __init__(self, varclass, func):
-        self.varclass: Any = varclass
-        self.func: Callable = func
 
 
 def build_controller(hook):
@@ -114,6 +105,19 @@ def interceptor(hook):
     return _1_wrapper
 
 
+def _make_default_json_encoders():
+    def _datetime_encoder(obj:datetime):
+        return obj.strftime('%Y-%m-%d %H:%M:%S')
+
+    def _model_encoder(obj:Model):
+        return obj.storage()
+
+    def _enum_encoder(obj:Enum):
+        return obj.value
+
+    return [_datetime_encoder, _model_encoder, _enum_encoder]
+
+
 class Application(object):
     """
     Application to delegate requests based on path.
@@ -129,7 +133,6 @@ class Application(object):
     def __init__(self, encoding='utf-8', debug=True) -> None:
         self.mapping = []
         self.interceptors = []
-        self.serializers = []
         self.encoding: str = encoding
         self.debug: bool = debug
 
@@ -226,53 +229,6 @@ class Application(object):
             hook = hook.controller
         self.mapping.append(Mapping(pattern, method, hook, doc, patternobj, view, querynames))
 
-    def add_serializer(self, varclass, func):
-        """
-        Example:
-
-            from datetime import datetime
-            from lessweb import Application
-            app = Application()
-            app.add_serializer(varclass=datetime, func=lambda x: x.strftime('%H:%M:%S'))
-            app.add_mapping('/now', 'GET', lambda ctx: {'time': datetime.now()})
-            app.run()
-
-        Column and Data Types — SQLAlchemy
-            http://docs.sqlalchemy.org/en/latest/core/type_basics.html
-        """
-        assert isinstance(varclass, type) or \
-               (isinstance(varclass, tuple) and all(isinstance(x, type) for x in varclass)), \
-            str(varclass)
-        self.serializers.append(Serializer(varclass, func))
-
-    def serialize(self, obj)->str:
-        """
-        把obj序列化为str
-
-            >>> from datetime import datetime
-            >>> app = Application(encoding='utf-8')
-            >>> app.add_serializer(varclass=datetime, func=lambda x: x.strftime('%Y-%m-%d'))
-            >>> app.serialize({'time': datetime(2000, 1, 1)})
-            '{"time": "2000-01-01"}'
-        """
-        serializers = self.serializers
-        class _1_Encoder(json.JSONEncoder):
-            def default(self, obj):
-                for f in serializers:
-                    if isinstance(obj, f.varclass):
-                        return f.func(obj)
-
-                if isinstance(obj, datetime):
-                    return obj.strftime('%Y-%m-%d %H:%M:%S')
-                elif isinstance(obj, Model):
-                    return obj.storage()
-                elif isinstance(obj, DefaultEnum):
-                    return obj.value
-                else:
-                    return json.JSONEncoder.default(self, obj)
-
-        return json.dumps(obj, cls=_1_Encoder)
-
     def wsgifunc(self, *middleware):
         """
             Example:
@@ -316,7 +272,7 @@ class Application(object):
                         yield b''
                     else:
                         ctx.set_header('Content-Type', 'application/json')
-                        yield self.serialize(r).encode(self.encoding)
+                        yield json_dumps(r, _make_default_json_encoders()).encode(self.encoding)
 
             result = _2_build_result(result)
             status = '{0} {1}'.format(ctx.status_code, ctx.reason)

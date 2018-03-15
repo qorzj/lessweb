@@ -14,7 +14,7 @@ hop_by_hop_headers = (
     'Upgrade',
 )
 
-status_dict = {
+status_table = {
     200: 'OK',
     201: 'Created',
     202: 'Accepted',
