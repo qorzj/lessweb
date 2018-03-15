@@ -53,6 +53,10 @@ class HttpError(Exception):
         self.text: str = text
         self.headers = headers or {}
 
+    @property
+    def reason(self):
+        return status_table.get(self.status_code, 'Other Error')
+
 
 class _Redirect(HttpError):
     def __init__(self, status_code, fullurl, headers):

@@ -16,7 +16,7 @@ from urllib.parse import splitquery, urlencode
 from io import BytesIO
 from contextlib import contextmanager
 
-from lessweb.webapi import HttpError, NeedParamError, BadParamError
+from lessweb.webapi import HttpError, NotFound, NoMethod, NeedParamError, BadParamError
 from lessweb.context import Context
 from lessweb.model import fetch_param, Model
 from lessweb.storage import Storage
@@ -161,20 +161,32 @@ class Application(object):
         return ctx
 
     def _handle_with_hooks(self, ctx):
+        def _2_notfound_hook():
+            raise NotFound(text="Not Found")
+
         def _1_mapping_match():
+            supported_methods = []
             for mapping in self.mapping:
-                _ = mapping.patternobj.search(ctx.path)
-                if _ and (mapping.method == ctx.method or mapping.method == '*'):
-                    ctx.url_input = _.groupdict()
-                    ctx.view = mapping.view
-                    if mapping.querynames == '*':
-                        ctx.querynames = None
-                    elif isinstance(mapping.querynames, str):
-                        ctx.querynames = mapping.querynames.replace(',', ' ').split()
+                if mapping.patternobj.search(ctx.path):
+                    if mapping.method == ctx.method or mapping.method == '*':
+                        ctx.url_input = _.groupdict()
+                        ctx.view = mapping.view
+                        if mapping.querynames == '*':
+                            ctx.querynames = None
+                        elif isinstance(mapping.querynames, str):
+                            ctx.querynames = mapping.querynames.replace(',', ' ').split()
+                        else:
+                            ctx.querynames = mapping.querynames
+                        return mapping.hook
                     else:
-                        ctx.querynames = mapping.querynames
-                    return mapping.hook
-            raise HttpError(status_code=404, text='Not Found', headers={})
+                        supported_methods.append(mapping.method)
+
+            if not supported_methods:
+                return _2_notfound_hook
+            else:
+                def _1_1_nomethod_hook():
+                    raise NoMethod(text="Method Not Allowed", methods=supported_methods)
+                return _1_1_nomethod_hook
 
         try:
             f = build_controller(_1_mapping_match())
@@ -184,6 +196,9 @@ class Application(object):
                     f = interceptor(itr.hook)(f)
             return f(ctx)
         except HttpError as e:
+            ctx.status_code = e.status_code
+            ctx.reason = e.reason
+            ctx.headers = e.headers
             return e.text
         except (NeedParamError, BadParamError) as e:
             ctx.status_code = 400

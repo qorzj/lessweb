@@ -134,3 +134,14 @@ class TestUsage(TestCase):
         app.add_mapping('/add', 'GET', interceptor(wrapper3)(add3), view='sum={}')
         with app.test_get('/add') as ret:
             self.assertEquals(ret, 'sum=xy')
+
+    def test_http_error(self):
+        app = Application()
+        app.add_mapping('/add', 'GET', add1)
+        with app.test_get('/add/', {'a': 1, 'b': 2}, status_code=404) as ret:
+            self.assertEquals(ret, 'Not Found')
+
+        app = Application()
+        app.add_mapping('/add', 'GET', add1)
+        with app.test_post('/add', {'a': 1, 'b': 2}, status_code=405) as ret:
+            self.assertEquals(ret, 'Method Not Allowed')
