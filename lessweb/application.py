@@ -167,7 +167,8 @@ class Application(object):
         def _1_mapping_match():
             supported_methods = []
             for mapping in self.mapping:
-                if mapping.patternobj.search(ctx.path):
+                _ = mapping.patternobj.search(ctx.path)
+                if _:
                     if mapping.method == ctx.method or mapping.method == '*':
                         ctx.url_input = _.groupdict()
                         ctx.view = mapping.view
