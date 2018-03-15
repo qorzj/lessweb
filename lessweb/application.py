@@ -17,7 +17,6 @@ from io import BytesIO
 from contextlib import contextmanager
 
 from lessweb.webapi import HttpError, NeedParamError, BadParamError
-from lessweb.sugar import *
 from lessweb.context import Context
 from lessweb.model import fetch_param, Model
 from lessweb.storage import Storage
@@ -25,13 +24,8 @@ from lessweb.utils import eafp, json_dumps
 
 
 __all__ = [
-    "global_data", "ModelView", "Interceptor", "Mapping", "interceptor", "Application",
+    "global_data", "Interceptor", "Mapping", "interceptor", "Application",
 ]
-
-
-class ModelView(NamedTuple):
-    """ModelView接口"""
-    controller: Callable
 
 
 # Application.interceptors: List[Interceptor]
@@ -225,8 +219,6 @@ class Application(object):
         """
         method = method.upper()
         patternobj = re.compile('^' + pattern + '$')
-        if _is(ModelView)(hook):
-            hook = hook.controller
         self.mapping.append(Mapping(pattern, method, hook, doc, patternobj, view, querynames))
 
     def wsgifunc(self, *middleware):
