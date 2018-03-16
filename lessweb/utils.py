@@ -63,3 +63,26 @@ def re_standardize(pattern):
         return '(?P<%s>[^/]*)' % x
 
     return re.sub(r'\{([^0-9].*?)\}', _repl, pattern)
+
+
+def fields_in_query(query):
+    """
+        >>> fields_in_query('a=1&b=2')
+        {'a': '1', 'b': '2'}
+
+        >>> fields_in_query('')
+        {}
+
+        >>> fields_in_query('?')
+        {}
+
+    """
+    ret = {}
+    if query and query[0] == '?':
+        query = query[1:]
+    if not query:
+        return ret
+    for seg in query.split('&'):
+        k, v = seg.split('=', 1)
+        ret[k] = v
+    return ret

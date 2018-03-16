@@ -29,8 +29,8 @@ def wrapper3(ctx:Context):
     return ctx.view.format(ctx()['ans'])
 
 
-def show_method(ctx:Context):
-    return ctx.method
+def show_method(ctx:Context, a='x', b='y'):
+    return {'ans': ctx.method + a + b}
 
 
 class TestUsage(TestCase):
@@ -159,4 +159,13 @@ class TestUsage(TestCase):
         app = Application()
         app.add_mapping('/', 'put', show_method)
         with app.test_put('/') as ret:
-            self.assertEquals(ret, 'PUT')
+            self.assertEquals(ret, {'ans': 'PUTxy'})
+
+        app = Application()
+        app.add_delete_interceptor('/add/.*', wrapper)
+        app.add_delete_mapping('/add/del', show_method)
+        app.add_delete_mapping('/del/{a}/{b}', show_method)
+        with app.test_delete('/add/del?a=2&b=3') as ret:
+            self.assertEquals(ret, {'ans': '[DELETE23]'})
+        with app.test_delete('/del/1/') as ret:
+            self.assertEquals(ret, {'ans': 'DELETE1'})

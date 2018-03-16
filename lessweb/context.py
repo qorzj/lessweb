@@ -14,7 +14,7 @@ from io import BytesIO
 
 from lessweb.storage import Storage
 from lessweb.webapi import UploadedFile, HttpError, mimetypes, hop_by_hop_headers
-from lessweb.utils import _nil
+from lessweb.utils import _nil, fields_in_query
 
 
 def _process_fieldstorage(fs):
@@ -136,8 +136,12 @@ class Context(object):
             return self.json_input
         else:
             try:
+                if self.method in ['HEAD', 'DELETE']:
+                    self._fields = fields_in_query(self.query)
+                    return self._fields
+
                 # cgi.FieldStorage can raise exception when handle some input
-                if self.method in ['GET', 'HEAD', 'DELETE']:
+                if self.method == 'GET':
                     _ = cgi.FieldStorage(environ=self.env.copy(), keep_blank_values=1)
                 else:
                     fp = BytesIO(self.data())
