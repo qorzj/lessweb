@@ -17,10 +17,11 @@ from io import BytesIO
 from contextlib import contextmanager
 
 from lessweb.webapi import HttpError, NotFound, NoMethod, NeedParamError, BadParamError
+from lessweb.webapi import http_methods
 from lessweb.context import Context
 from lessweb.model import fetch_param, Model
 from lessweb.storage import Storage
-from lessweb.utils import eafp, json_dumps
+from lessweb.utils import eafp, json_dumps, re_standardize
 
 
 __all__ = [
@@ -31,29 +32,29 @@ __all__ = [
 # Application.interceptors: List[Interceptor]
 class Interceptor:
     """Interceptor to定义拦截器based on path prefix"""
-    def __init__(self, prefix, method, hook, excludes) -> None:
-        self.prefix: str = prefix
+    def __init__(self, pattern, method, dealer, patternobj) -> None:
+        self.pattern: str = pattern
         self.method: str = method
-        self.hook: Callable = hook
-        self.excludes: Tuple = excludes
+        self.dealer: Callable = dealer
+        self.patternobj: Any = patternobj
 
 
 # Application.mapping: List[Mapping]
 class Mapping:
     """Mapping to定义请求处理者和path的对应关系"""
-    def __init__(self, pattern, method, hook, doc, patternobj, view, querynames) -> None:
+    def __init__(self, pattern, method, dealer, doc, patternobj, view, querynames) -> None:
         self.pattern: str = pattern
         self.method: str = method
-        self.hook: Callable = hook
+        self.dealer: Callable = dealer
         self.doc: str = doc
         self.patternobj: Any = patternobj
         self.view = view
         self.querynames = querynames
 
 
-def build_controller(hook):
+def build_controller(dealer):
     """
-    把接收多个参数的hook转变成只接收一个参数(ctx)的函数
+    把接收多个参数的dealer转变成只接收一个参数(ctx)的函数
 
         >>> def controller(ctx, id:int, lpn):
         ...     return {'ctx': ctx, 'id': id, 'lpn': lpn}
@@ -63,22 +64,21 @@ def build_controller(hook):
         >>> assert ret == {'ctx': ctx, 'id': 5, 'lpn': 'HK888'}, ret
     """
     def _1_controller(ctx:Context):
-        params = fetch_param(ctx, hook)
-        return hook(**params)
+        params = fetch_param(ctx, dealer)
+        return dealer(**params)
 
     return _1_controller
 
 
-def interceptor(hook):
+def interceptor(dealer):
     """
     为controller添加interceptor的decorator
-    hook第一个参数必须是ctx，其他参数的值会从前端请求中获取
-    在hook函数中调用ctx()，就会执行它修饰的controller
+    在dealer函数中调用ctx()，就会执行它修饰的controller
 
-        >>> def hook(ctx, id:int, pageNo:int):
+        >>> def dealer(ctx, id:int, pageNo:int):
         ...     assert id == 5 and pageNo == 3, (id, pageNo)
         ...     return list(ctx())
-        >>> @interceptor(hook)
+        >>> @interceptor(dealer)
         ... def controller(ctx, id:int, lpn):
         ...     return {'ctx': ctx, 'id': id, 'lpn': lpn}
         >>> ctx = Context()
@@ -89,8 +89,8 @@ def interceptor(hook):
     def _1_wrapper(fn):
         def _1_1_controller(ctx:Context):
             ctx.app_stack.append(build_controller(fn))
-            params = fetch_param(ctx, hook)
-            result = hook(**params)
+            params = fetch_param(ctx, dealer)
+            result = dealer(**params)
             ctx.app_stack.pop()  # 有多次调用ctx()的可能性，比如批量删除
             return result
 
@@ -160,8 +160,8 @@ class Application(object):
         ctx.fullpath = ctx.path + '?' + ctx.query if ctx.query else ctx.path
         return ctx
 
-    def _handle_with_hooks(self, ctx):
-        def _2_notfound_hook():
+    def _handle_with_dealers(self, ctx):
+        def _2_notfound_dealer():
             raise NotFound(text="Not Found")
 
         def _1_mapping_match():
@@ -178,23 +178,22 @@ class Application(object):
                             ctx.querynames = mapping.querynames.replace(',', ' ').split()
                         else:
                             ctx.querynames = mapping.querynames
-                        return mapping.hook
+                        return mapping.dealer
                     else:
                         supported_methods.append(mapping.method)
 
             if not supported_methods:
-                return _2_notfound_hook
+                return _2_notfound_dealer
             else:
-                def _1_1_nomethod_hook():
+                def _1_1_nomethod_dealer():
                     raise NoMethod(text="Method Not Allowed", methods=supported_methods)
-                return _1_1_nomethod_hook
+                return _1_1_nomethod_dealer
 
         try:
             f = build_controller(_1_mapping_match())
             for itr in self.interceptors:
-                if ctx.path.startswith(itr.prefix) and (itr.method == ctx.method or itr.method == '*') \
-                        and all(not ctx.path.startswith(p) for p in itr.excludes):
-                    f = interceptor(itr.hook)(f)
+                if itr.patternobj.search(ctx.path) and (itr.method == ctx.method or itr.method == '*'):
+                    f = interceptor(itr.dealer)(f)
             return f(ctx)
         except HttpError as e:
             ctx.status_code = e.status_code
@@ -207,7 +206,8 @@ class Application(object):
             ctx.headers = {'Content-Type': 'text/html'}
             return repr(e)
 
-    def add_interceptor(self, hook, prefix='/', method='*', excludes=('/static/',)):
+    # def add_interceptor(self, dealer, prefix='/', method='*', excludes=('/static/',)):
+    def add_interceptor(self, pattern, method, dealer):
         """
         Example:
 
@@ -217,9 +217,13 @@ class Application(object):
             app.add_mapping('/hello', 'GET', lambda ctx: 'Hello')
             app.run()
         """
-        self.interceptors.insert(0, Interceptor(prefix, method, hook, excludes))
+        assert isinstance(pattern, str), 'pattern:[{}] should be RegExp str'.format(pattern)
+        method = method.upper()
+        assert method == '*' or method in http_methods, 'Method:[{}] should be one of {}'.format(method, ['*'] + http_methods)
+        patternobj = re.compile(re_standardize(pattern))
+        self.interceptors.insert(0, Interceptor(pattern, method, dealer, patternobj))
 
-    def add_mapping(self, pattern, method, hook, doc='', view=None, querynames='*'):
+    def add_mapping(self, pattern, method, dealer, doc='', view=None, querynames='*'):
         """
         Example:
 
@@ -233,9 +237,11 @@ class Application(object):
             app.add_mapping('/age/(?P<age>[0-9]+)', 'GET', sayhello)
             app.run()
         """
+        assert isinstance(pattern, str), 'pattern:[{}] should be RegExp str'.format(pattern)
         method = method.upper()
-        patternobj = re.compile('^' + pattern + '$')
-        self.mapping.append(Mapping(pattern, method, hook, doc, patternobj, view, querynames))
+        assert method == '*' or method in http_methods, 'Method:[{}] should be one of {}'.format(method, ['*'] + http_methods)
+        patternobj = re.compile(re_standardize(pattern))
+        self.mapping.append(Mapping(pattern, method, dealer, doc, patternobj, view, querynames))
 
     def wsgifunc(self, *middleware):
         """
@@ -263,7 +269,7 @@ class Application(object):
 
             ctx = self._load(env)
             try:
-                _ = self._handle_with_hooks(ctx)
+                _ = self._handle_with_dealers(ctx)
                 result = _1_peep(_) if isinstance(_, GeneratorType) else (_,)
             except Exception as e:
                 logging.exception(e)

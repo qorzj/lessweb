@@ -29,6 +29,10 @@ def wrapper3(ctx:Context):
     return ctx.view.format(ctx()['ans'])
 
 
+def show_method(ctx:Context):
+    return ctx.method
+
+
 class TestUsage(TestCase):
     # if argument didn't annotate Context type, then do not inject ctx value
     def test_fetch_param(self):
@@ -44,13 +48,13 @@ class TestUsage(TestCase):
 
         app = Application()
         app.add_mapping('/add', 'GET', add1)
-        app.add_interceptor(wrapper)
+        app.add_interceptor('.*', '*', wrapper)
         with app.test_get('/add', {'a': 'a', 'b': 'b'}) as ret:
             self.assertEquals(ret, {'ans': '[ab]'})
 
         app = Application()
         app.add_mapping('/add', 'GET', add2)
-        app.add_interceptor(wrapper)
+        app.add_interceptor('.*', '*', wrapper)
         with app.test_get('/add', {'a': 'a', 'b': 'b'}) as ret:
             self.assertEquals(ret, {'ans': '[/add:ab]'})
 
@@ -63,6 +67,11 @@ class TestUsage(TestCase):
         app.add_mapping('/add', 'GET', interceptor(wrapper)(add2))
         with app.test_get('/add', {'a': 'a', 'b': 'b'}) as ret:
             self.assertEquals(ret, {'ans': '[/add:ab]'})
+
+        app = Application()
+        app.add_mapping('/add/{a}/{b}', 'GET', add1)
+        with app.test_get('/add/x/2') as ret:
+            self.assertEquals(ret, {'ans': 'x2'})
 
     def test_need_param(self):
         app = Application()
@@ -145,3 +154,9 @@ class TestUsage(TestCase):
         app.add_mapping('/add', 'GET', add1)
         with app.test_post('/add', {'a': 1, 'b': 2}, status_code=405) as ret:
             self.assertEquals(ret, 'Method Not Allowed')
+
+    def test_router(self):
+        app = Application()
+        app.add_mapping('/', 'put', show_method)
+        with app.test_put('/') as ret:
+            self.assertEquals(ret, 'PUT')

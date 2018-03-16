@@ -16,6 +16,6 @@ class TestWebapi(TestCase):
     def test_200s(self):
         app = Application()
         app.add_mapping('/add', 'GET', add)
-        app.add_interceptor(add)
+        app.add_interceptor('/add', 'GET', add)
         ret = app.request('/add?a=1&b=2')
         self.assertEquals(ret.status, '204 No Content')

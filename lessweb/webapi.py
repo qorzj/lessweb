@@ -14,6 +14,10 @@ hop_by_hop_headers = (
     'Upgrade',
 )
 
+http_methods = (
+    'GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH',
+)
+
 status_table = {
     200: 'OK',
     201: 'Created',
