@@ -129,13 +129,13 @@ class TestUsage(TestCase):
             self.assertEquals(ret, {'ans': '23'})
 
         app = Application()
-        app.add_mapping('/add', 'GET', add3, querynames='b')
-        with app.test_get('/add', {'a': 2, 'b': 3}) as ret:
+        app.add_mapping('/add', 'POST', add3, querynames='b')
+        with app.test_post('/add', {'a': 2, 'b': 3}) as ret:
             self.assertEquals(ret, {'ans': 'x3'})
 
         app = Application()
-        app.add_mapping('/add', 'GET', add1, querynames='b')
-        with app.test_get('/add', {'a': 2, 'b': 3}, status_code=400) as ret:
+        app.add_mapping('/add', 'POST', add1, querynames='b')
+        with app.test_post('/add', {'a': 2, 'b': 3}, status_code=400) as ret:
             self.assertEquals(ret, 'lessweb.NeedParamError query:a doc:a')
 
     def test_view(self):
