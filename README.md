@@ -11,11 +11,11 @@ pip3 install lessweb
 ## Hello World!
 ```python
 import lessweb
-def hello(ctx):
+def hello():
     return 'Hello, world!'
 
 app = lessweb.Application()
-app.add_mapping('/.*', 'GET', hello)
+app.add_get_mapping('/', hello)
 app.run()
 ```
 
