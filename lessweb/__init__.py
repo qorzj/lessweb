@@ -1,14 +1,12 @@
 """lessweb: 用最python3的方法创建web apps"""
 
 
-from .webapi import HttpError
-
 __version__ = '0.1.7'
 __author__ = [
     'qorzj <inull@qq.com>',
 ]
 
-__license__ = "public domain"
+__license__ = "MIT"
 
 from . import application, context, model, storage, webapi
 
