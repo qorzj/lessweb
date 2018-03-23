@@ -1,5 +1,6 @@
 import json
 import re
+from enum import Enum
 from typing import get_type_hints
 
 
@@ -86,3 +87,19 @@ def fields_in_query(query):
         k, v = seg.split('=', 1)
         ret[k] = v
     return ret
+
+
+class SmartEnum:
+    def __init__(self, name=None):
+        self.name = name
+
+    def __getattr__(self, x):
+        return SmartEnum(x)
+
+    def __eq__(self, other):
+        if not isinstance(other, Enum):
+            return False
+        return other.name == self.name
+
+
+smartenum = SmartEnum()
