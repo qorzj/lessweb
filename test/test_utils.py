@@ -3,7 +3,7 @@ from enum import Enum
 from datetime import datetime
 
 from lessweb.utils import json_dumps
-from lessweb.utils import smartenum as se
+from lessweb.utils import anyenum as ae
 
 
 class Num(Enum):
@@ -26,11 +26,11 @@ class TestUtils(TestCase):
         self.assertEquals(ret, '[[3, 4], 2, "2018-01-31 00:00:00"]')
 
     def testSmartenum(self):
-        self.assertTrue(se.one != Num.two)
-        self.assertTrue(se.two == Num.two)
-        self.assertTrue(se.three != Num.two)
-        self.assertTrue(Num.one != se.three)
-        self.assertTrue(Num.one != se.two)
-        self.assertTrue(Num.one == se.one)
-        self.assertTrue(Num.one in [se.three, se.two, se.one])
-        self.assertTrue(Num.two not in [se.three, se.one])
+        self.assertTrue(ae.one != Num.two)
+        self.assertTrue(ae.two == Num.two)
+        self.assertTrue(ae.three != Num.two)
+        self.assertTrue(Num.one != ae.three)
+        self.assertTrue(Num.one != ae.two)
+        self.assertTrue(Num.one == ae.one)
+        self.assertTrue(Num.one in [ae.three, ae.two, ae.one])
+        self.assertTrue(Num.two not in [ae.three, ae.one])

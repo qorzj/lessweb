@@ -89,12 +89,12 @@ def fields_in_query(query):
     return ret
 
 
-class SmartEnum:
+class AnyEnum:
     def __init__(self, name=None):
         self.name = name
 
     def __getattr__(self, x):
-        return SmartEnum(x)
+        return AnyEnum(x)
 
     def __eq__(self, other):
         if not isinstance(other, Enum):
@@ -102,4 +102,4 @@ class SmartEnum:
         return other.name == self.name
 
 
-smartenum = SmartEnum()
+anyenum = AnyEnum()
