@@ -194,7 +194,7 @@ def fetch_model_param(ctx: Context, cls, fn):
         else:
             if anno is _nil: vartype = str
             elif anno is int: vartype = lambda x: max(int(x), 0)
-            elif issubclass(anno, Enum): vartype = lambda x: anno(int(x))
+            elif isinstance(anno, type) and issubclass(anno, Enum): vartype = lambda x: anno(int(x))
             else: vartype = anno
             default = None if default is _nil else default
             param = RestParam(getter=vartype, default=default, doc=realname)
@@ -234,7 +234,7 @@ def fetch_param(ctx: Context, fn):
         else:
             if anno is _nil: vartype = str
             elif anno is int: vartype = lambda x: max(int(x), 0)
-            elif issubclass(anno, Enum):
+            elif isinstance(anno, type) and issubclass(anno, Enum):
                 def _enum_init(x, T=anno):
                     for e in T.__members__.values():
                         if str(e.value) == str(x):
