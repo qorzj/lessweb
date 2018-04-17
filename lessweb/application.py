@@ -161,9 +161,6 @@ class Application(object):
         return ctx
 
     def _handle_with_dealers(self, ctx):
-        def _2_notfound_dealer():
-            raise NotFound(text="Not Found")
-
         def _1_mapping_match():
             supported_methods = []
             for mapping in self.mapping:
@@ -183,11 +180,9 @@ class Application(object):
                         supported_methods.append(mapping.method)
 
             if not supported_methods:
-                return _2_notfound_dealer
+                raise NotFound(text="Not Found")
             else:
-                def _1_1_nomethod_dealer():
-                    raise NoMethod(text="Method Not Allowed", methods=supported_methods)
-                return _1_1_nomethod_dealer
+                raise NoMethod(text="Method Not Allowed", methods=supported_methods)
 
         try:
             f = build_controller(_1_mapping_match())

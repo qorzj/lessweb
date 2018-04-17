@@ -146,7 +146,8 @@ class TestUsage(TestCase):
 
     def test_http_error(self):
         app = Application()
-        app.add_mapping('/add', 'GET', add1)
+        app.add_get_interceptor('.*', lambda:'a')
+        app.add_mapping('/a', 'POST', add1)
         with app.test_get('/add/', {'a': 1, 'b': 2}, status_code=404) as ret:
             self.assertEquals(ret, 'Not Found')
 
