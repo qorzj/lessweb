@@ -7,13 +7,12 @@ import requests
 from wsgiref.handlers import format_date_time
 from datetime import datetime, timedelta
 from time import mktime
-from http.cookies import Morsel, SimpleCookie, CookieError
-from urllib.parse import unquote, quote
 
 from io import BytesIO
 
 from lessweb.storage import Storage
 from lessweb.webapi import UploadedFile, HttpError, mimetypes, hop_by_hop_headers
+from lessweb.webapi import make_cookie, parse_cookie
 from lessweb.utils import _nil, fields_in_query
 
 
@@ -108,7 +107,13 @@ class Context(object):
         assert isinstance(header, str) and isinstance(value, str)
         if '\n' in header or '\r' in header or '\n' in value or '\r' in value:
             raise ValueError('invalid characters in header')
-        self.headers[header] = value
+        self.headers[header, value] = 1
+
+    def set_header_default(self, header, value):
+        for k, v in self.headers.keys():
+            if k.lower() == header.lower():
+                return
+        self.set_header(header, value)
 
     def get_header(self, header, default=None):
         """
@@ -179,76 +184,15 @@ class Context(object):
 
         return self.field_input.get(queryname, default)
 
-    def static_file(self, path, basepath='./static', max_age=900, enable_gzip=False):
-        """
-        Example:
-
-        """
-        if '..' in basepath:
-            raise HttpError(404, 'not found')
-        fullpath = os.path.join(basepath, path)
-        try:
-            data = open(fullpath, 'rb').read()
-            modify_stamp = os.path.getmtime(fullpath)
-        except:
-            raise HttpError(404, 'not found')
-        if enable_gzip and 'gzip' in self.get_header('Accept-Encoding'):
-            self.set_header('Content-Encoding', 'gzip')
-            data = gzip.compress(data)
-        expire_at = datetime.now() + timedelta(seconds=max_age)
-        expire_stamp = mktime(expire_at.timetuple())
-        self.set_header('Cache-Control', 'max-age=%d' % max_age)
-        self.set_header('Expires', format_date_time(expire_stamp))
-        self.set_header('Last-Modified', format_date_time(modify_stamp))
-        suffix = (path.rsplit('/', 1)[-1] if '/' in path else path)
-        if '.' in suffix:
-            suffix = suffix.rsplit('.', 1)[-1]
-            if suffix in mimetypes:
-                self.set_header('Content-Type', mimetypes[suffix])
-        return data
-
-    def static_proxy(self, dist_host, fullpath=None):
-        headers = {}
-        for wsgi_key, value in self.env.items():
-            if wsgi_key.startswith('HTTP_'):
-                headers[wsgi_key[5:].replace('_', '-')] = value
-        if fullpath is None:
-            fullpath = self.fullpath
-        conn = requests.get(dist_host + fullpath, headers=headers)
-        resp_headers = {k: v for k, v in conn.headers.items() if k not in hop_by_hop_headers}
-        self.headers.update(resp_headers)
-        if conn.status_code > 299:
-            raise HttpError(conn.status_code, conn.text, self.headers)
-        return conn.content
-
     def set_cookie(self, name, value, expires='', domain=None, secure=False, httponly=False, path=None):
         """Set a cookie."""
-        morsel = Morsel()
-        morsel.set(name, value, quote(value))
-        if isinstance(expires, int) and expires < 0:
-            expires = -1000000000
-        morsel['expires'] = expires
-        morsel['path'] = path or self.homepath + '/'
-        if domain: morsel['domain'] = domain
-        if secure: morsel['secure'] = secure
-        value = morsel.OutputString()
-        if httponly: value += '; httponly'
+        path = path or self.homepath + '/'
+        value = make_cookie(name, value, expires, path, domain, secure, httponly)
         self.set_header('Set-Cookie', value)
 
     def get_cookie(self):
         """Get cookies --> Dict"""
         http_cookie = self.get_header('cookie', '')
-        cookie = SimpleCookie()
-        try:
-            cookie.load(http_cookie)
-        except CookieError:
-            cookie = SimpleCookie()
-            for attr_value in http_cookie.split(';'):
-                try:
-                    cookie.load(attr_value)
-                except CookieError:
-                    pass
-        cookies = dict([(k, unquote(v.value)) for k, v in cookie.items()])
-        return cookies
+        return parse_cookie(http_cookie)
 
     # ~class Context

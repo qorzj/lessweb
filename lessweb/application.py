@@ -193,12 +193,12 @@ class Application(object):
         except HttpError as e:
             ctx.status_code = e.status_code
             ctx.reason = e.reason
-            ctx.headers = e.headers
+            ctx.headers = {(k,v):1 for k,v in e.headers.items()}
             return e.text
         except (NeedParamError, BadParamError) as e:
             ctx.status_code = 400
             ctx.reason = 'Bad Request'
-            ctx.headers = {'Content-Type': 'text/html'}
+            ctx.headers = {('Content-Type', 'text/html; charset=' + self.encoding): 1}
             return repr(e)
 
     def add_interceptor(self, pattern, method, dealer):
@@ -333,8 +333,8 @@ class Application(object):
 
             result = _2_build_result(result)
             status = '{0} {1}'.format(ctx.status_code, ctx.reason)
-            ctx.headers.setdefault('Content-Type', 'text/html; charset=' + self.encoding)
-            headers = list(ctx.headers.items())
+            ctx.set_header_default('Content-Type', 'text/html; charset=' + self.encoding)
+            headers = list(ctx.headers.keys())
             start_resp(status, headers)
             return itertools.chain(result, (b'',))
 
