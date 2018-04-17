@@ -124,16 +124,9 @@ def processor(ctx: DatabaseCtx):
     return ret
 
 
-def create_all(timeout=0):
-    start_at = time.time()
-    while 1:
-        try:
-            DbModel.metadata.create_all(global_data.db_engine)
-            return
-        except InterfaceError as e:
-            if time.time() - start_at > timeout:
-                raise e
-            time.sleep(1)
+def create_all(*DbModelClass):
+    for db_class in DbModelClass:
+        db_class.metadata.create_all(global_data.db_engine)
 
 
 @contextmanager
@@ -167,7 +160,7 @@ class UserInfo(DbModel):
 
 #CREATE TABLE
 from lessweb.plugin.database import create_all
-index.py: create_all()  #表已存在则忽略，不会清空数据或改变表结构。可以用drop_all()删表。但无法ALTER表结构
+index.py: create_all(DbUser)  #表已存在则忽略，不会清空数据或改变表结构。可以用drop_all()删表。但无法ALTER表结构
 
 #INSERT
 ##ADD A COOKIE
