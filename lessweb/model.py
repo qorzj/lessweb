@@ -11,54 +11,11 @@ from lessweb.storage import Storage
 
 
 class RestParam:
-    def __init__(self, getter=str, jsongetter=None, default=None, queryname=None, doc='') -> None:
-        self.getter: Callable = getter  # 用于从str获取值
-        self.jsongetter: Optional[Callable] = jsongetter  # 用于从json获取值
-        self.default: Any = default
-        self.queryname: Optional[str] = queryname  # 用于指定前端使用的名称
-        self.doc: str = doc
+    def eval_from_text(self, text):
+        return
 
-
-def tips(slot: str):
-    """
-        >>> @tips('st')
-        ... def tag(x):
-        ...     return x + x
-        >>> @tag(5)
-        ... @tag(3)
-        ... def f():
-        ...     pass
-        >>> assert f.__tips__['st'] == [6, 10]
-    """
-    def g(fn):
-        def f(*a, **b):
-            tip_value = fn(*a, **b)
-            def h(foo):
-                @functools.wraps(foo)
-                def goo(*p, **q):
-                    return foo(*p, **q)
-
-                if not hasattr(goo, '__tips__'):
-                    goo.__tips__ = {}
-                goo.__tips__.setdefault(slot, [])
-                goo.__tips__[slot].append(tip_value)
-                return goo
-            return h
-        return f
-    return g
-
-
-@tips('rest-param')
-def rest_param(realname, *, getter=str, jsongetter=None, default=None, queryname=None, doc=None):
-    """
-    >>> @rest_param('x')
-    ... def foo(x): pass
-    >>> a: RestParam = foo.__tips__['rest-param']
-    >>> assert (a.getter, a.jsongetter, a.default, a.queryname, a.doc) == (str, None, None, 'x', 'x')
-    """
-    if doc is None: doc = realname
-    if queryname is None: queryname = realname
-    return realname, RestParam(getter, jsongetter, default, queryname, doc)
+    def eval_from_json(self, obj):
+        return
 
 
 def get_func_parameters(func):
@@ -78,15 +35,12 @@ def get_func_parameters(func):
     ]
 
 
-def get_tips(fn, slot: str):
-    return getattr(fn, '__tips__', {}).get(slot, [])
-
-
 def get_annotations(x):
     return getattr(x, '__annotations__', {})
 
 
 def get_model_parameters(cls):
+    """get_model_parameters(Class) -> [(realname, Type, default), ...]"""
     annos = get_annotations(cls)
     inst = cls()
     defaults = {
@@ -133,41 +87,66 @@ class Model:
         return '<Model ' + repr(dict(self.storage())) + '>'
 
 
-def input_by_choose(ctx: Context, fn, realname, rest_param: RestParam):
+def input_by_choose(ctx: Context, fn, realname, realtype, default):
     """
 
         >>> def foo(a, b, c=0, d=1, e=2):
         ...     pass
         >>> ctx = Context()
         >>> ctx._fields = dict(a='A', b='B', c='C', d='D', e='E', f='F')
-        >>> [input_by_choose(ctx, foo, k, RestParam()) for k in 'abcde']
+        >>> ctx.querynames = 'a,b,c'
+        >>> [input_by_choose(ctx, foo, k, realtype=str, default=None) for k in 'abcde']
         ['A', 'B', 'C', None, None]
     """
-    if ctx.is_json_request():
-        getter = rest_param.jsongetter or rest_param.getter
-    else:
-        getter = rest_param.getter
-    queryname = rest_param.queryname or realname
+    # if ctx.is_json_request():
+    #     getter = rest_param.jsongetter or rest_param.getter
+    # else:
+    #     getter = rest_param.getter
+    queryname = ctx.aliases.get(realname, realname)
 
     if realname in ctx._pipe:
         value = ctx.get_param(realname)
     else:
         pre_value = ctx.get_input(queryname, default=_nil)
         try:
-            if getter is None:
-                value = rest_param.default
-            else:
-                if pre_value is not _nil:
-                    value = getter(pre_value)
-                else:
-                    value = _nil
+            if pre_value is not _nil:
+                if not isinstance(realtype, type):
+                    value = realtype(pre_value)
+                elif not issubclass(realtype, RestParam):
+                    if realtype is int:
+                        value = max(int(pre_value), 0)
+                    elif issubclass(realtype, Enum):
+                        def _eval_enum(x, T):
+                            for e in T.__members__.values():
+                                if str(e.value) == str(x):
+                                    return e
+                            raise ValueError("%r is not a valid %s" % (x, T.__name__))
+
+                        value = _eval_enum(pre_value, realtype)
+                    else:
+                        value = realtype(pre_value)
+                else:  # realtype is subclass of RestParam
+                    value = realtype()
+                    if ctx.is_json_request():
+                        if hasattr(value, 'lessweb_eval_from_json'):
+                            value.lessweb_eval_from_json(pre_value)
+                        else:
+                            value.eval_from_json(pre_value)
+                    else:  # ctx is not json request
+                        if hasattr(value, 'lessweb_eval_from_text'):
+                            value.lessweb_eval_from_text(pre_value)
+                        else:
+                            value.eval_from_text(pre_value)
+
+            else:  # pre_value is _nil
+                value = _nil
         except (ValueError, TypeError) as e:
             raise BadParamError(query=queryname, error=str(e))
 
-    if value is _nil or value is None:
-        if rest_param.default is None:
+    if value is _nil:
+        if default is _nil:
             raise NeedParamError(query=queryname, doc=queryname)
-        return rest_param.default
+        return default
     else:
         return value
 
@@ -175,31 +154,22 @@ def input_by_choose(ctx: Context, fn, realname, rest_param: RestParam):
 def fetch_model_param(ctx: Context, cls, fn):
     """
 
-        >>> @rest_param('weight', getter=int, queryname='w')
-        ... class Person(Model):
+        >>> class Person(Model):
         ...     name: str
         ...     age: int
-        ...     weight = None
+        ...     weight: int
         >>> def get_person(ctx, person: Person): pass
         >>> ctx = Context()
+        >>> ctx.set_alias('weight', 'w')
         >>> ctx._fields = dict(name='Bob', age='33', w='100', x='1')
         >>> model = fetch_model_param(ctx, Person, get_person)
         >>> assert model.storage() == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
     """
-    restparam_tips = {k:v for k,v in get_tips(cls, 'rest-param')}
     result = {}
-    for realname, anno, default in get_model_parameters(cls):
-        if realname in restparam_tips:
-            param = restparam_tips[realname]
-        else:
-            if anno is _nil: vartype = str
-            elif anno is int: vartype = lambda x: max(int(x), 0)
-            elif isinstance(anno, type) and issubclass(anno, Enum): vartype = lambda x: anno(int(x))
-            else: vartype = anno
-            default = None if default is _nil else default
-            param = RestParam(getter=vartype, default=default, doc=realname)
-
-        value = input_by_choose(ctx, fn, realname, param)
+    for realname, realtype, default in get_model_parameters(cls):
+        if realtype is _nil:
+            realtype = str
+        value = input_by_choose(ctx, fn, realname, realtype, default)
         result[realname] = value
     model = cls()
     model.setall(**result)
@@ -208,44 +178,27 @@ def fetch_model_param(ctx: Context, cls, fn):
 
 def fetch_param(ctx: Context, fn):
     """
-
-        >>> @rest_param('weight', getter=int, queryname='w')
-        ... @rest_param('createAt', getter=None, default=2)
-        ... def get_person(ctx, name: str, age: int, weight, createAt:int=8):
+        >>> def get_person(ctx:Context, name:str, age:int, weight:int, createAt:int=2):
         ...     pass
         >>> ctx = Context()
+        >>> ctx.querynames = 'name,age,weight'
+        >>> ctx.set_alias('weight', 'w')
         >>> ctx._fields = dict(name='Bob', age='33', w='100', weight='1', createAt='9')
         >>> param = fetch_param(ctx, get_person)
-        >>> assert param == {'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
+        >>> assert param == {'ctx': ctx, 'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
     """
-    restparam_tips = {k:v for k,v in get_tips(fn, 'rest-param')}
     result = {}
-    for realname, anno, default in get_func_parameters(fn):
-        if isinstance(anno, type) and issubclass(anno, Context):
+    for realname, realtype, default in get_func_parameters(fn):
+        if isinstance(realtype, type) and issubclass(realtype, Context):
             result[realname] = ctx
             continue
 
-        if isinstance(anno, type) and issubclass(anno, Model):
-            result[realname] = fetch_model_param(ctx, anno, fn)
+        if isinstance(realtype, type) and issubclass(realtype, Model):
+            result[realname] = fetch_model_param(ctx, realtype, fn)
             continue
 
-        if realname in restparam_tips:
-            param = restparam_tips[realname]
-        else:
-            if anno is _nil: vartype = str
-            elif anno is int: vartype = lambda x: max(int(x), 0)
-            elif isinstance(anno, type) and issubclass(anno, Enum):
-                def _enum_init(x, T=anno):
-                    for e in T.__members__.values():
-                        if str(e.value) == str(x):
-                            return e
-                    raise ValueError("%r is not a valid %s" % (x, T.__name__))
-
-                vartype = _enum_init
-            else: vartype = anno
-            default = None if default is _nil else default
-            param = RestParam(getter=vartype, default=default, doc=realname)
-
-        value = input_by_choose(ctx, fn, realname, param)
+        if realtype is _nil: realtype = str
+        value = input_by_choose(ctx, fn, realname, realtype, default)
         result[realname] = value
+
     return result

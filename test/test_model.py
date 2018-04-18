@@ -4,16 +4,6 @@ from lessweb.utils import _nil
 from lessweb.model import RestParam, get_model_parameters, Model
 
 
-class TestRestParam(TestCase):
-    def test_restparam_default_values(self):
-        rest_param = RestParam()
-        self.assertEqual(rest_param.getter, str)
-        self.assertEqual(rest_param.jsongetter, None)
-        self.assertEqual(rest_param.default, None)
-        self.assertEqual(rest_param.queryname, None)
-        self.assertEqual(rest_param.doc, '')
-
-
 class TestTestModelParameters(TestCase):
     def test_ok(self):
         class _tmp_cls:

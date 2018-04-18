@@ -68,7 +68,8 @@ class Context(object):
         self.app_stack: List = []
         self.app = app
         self.view = None
-        self.querynames = None
+        self.querynames = None  # querynames in whitelist
+        self.aliases: Dict[str, str] = {}  # alias {realname: queryname}
 
         self.url_input: Dict = {}
         self.json_input: Optional[Dict] = None
@@ -109,6 +110,9 @@ class Context(object):
         """
         key = 'HTTP_' + header.replace('-', '_').upper()
         return self.env.get(key, default)
+
+    def set_alias(self, realname, queryname):
+        self.aliases[realname] = queryname
 
     def is_json_request(self):
         return self.json_input is not None or \

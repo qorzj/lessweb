@@ -10,7 +10,7 @@ import os
 import re
 import traceback
 from types import GeneratorType
-from typing import NamedTuple, Any, Callable, Tuple
+from typing import NamedTuple, Any, Callable, Tuple, Dict
 from enum import Enum
 from urllib.parse import splitquery, urlencode
 from io import BytesIO
