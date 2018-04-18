@@ -58,7 +58,7 @@ class HttpError(Exception):
     def __init__(self, *, status_code, text, headers=None):
         self.status_code: int = status_code
         self.text: str = text
-        self.headers = headers or {}
+        self.headers = headers or []
 
     @property
     def reason(self):
@@ -67,25 +67,21 @@ class HttpError(Exception):
 
 class _Redirect(HttpError):
     def __init__(self, status_code, fullurl, headers):
-        super().__init__(
-            status_code=status_code,
-            text='',
-            headers=dict(
-                headers,
-                **{'Content-Type': 'text/html', 'Location': fullurl},
-            )
-        )
+        headers = headers or []
+        set_header(headers, 'Content-Type', 'text/html', setdefault=True)
+        set_header(headers, 'Location', fullurl, setdefault=True)
+        super().__init__(status_code=status_code, text='', headers=headers)
 
 
 class Found(_Redirect):
     def __init__(self, url, headers=None):
-        headers = headers or {}
+        headers = headers or []
         super().__init__(status_code=302, fullurl=url, headers=headers)
 
 
 class SeeOther(_Redirect):
     def __init__(self, url, headers=None):
-        headers = headers or {}
+        headers = headers or []
         super().__init__(status_code=303, fullurl=url, headers=headers)
 
 
@@ -101,8 +97,8 @@ class TempRedirect(_Redirect):
 
 class _TextHttpError(HttpError):
     def __init__(self, status_code, text, headers):
-        headers = headers or {}
-        headers = dict(headers, **{'Content-Type': 'text/html'})
+        headers = headers or []
+        set_header(headers, 'Content-Type', 'text/html', setdefault=True)
         super().__init__(status_code=status_code, text=text, headers=headers)
 
 
@@ -123,17 +119,16 @@ class Forbidden(_TextHttpError):
 
 class NotFound(HttpError):
     def __init__(self, text, headers=None):
-        headers = headers or {}
-        if not headers:
-            headers = {'Content-Type': 'text/html'}
+        headers = headers or []
+        set_header(headers, 'Content-Type', 'text/html', setdefault=True)
         super().__init__(status_code=404, text=text, headers=headers)
 
 
 class NoMethod(_TextHttpError):
     def __init__(self, text='', methods=None and ['GET', ...], headers=None):
-        headers = headers or {}
+        headers = headers or []
         if methods:
-            headers = dict(headers, Allow=', '.join(methods))
+            set_header(headers, 'Allow', ', '.join(methods), setdefault=True)
         super().__init__(status_code=405, text=text, headers=headers)
 
 
@@ -170,6 +165,19 @@ class UnavailableForLegalReasons(_TextHttpError):
 class InternalError(_TextHttpError):
     def __init__(self, text='internal server error', headers=None):
         super().__init__(status_code=500, text=text, headers=headers)
+
+
+def set_header(headers, key, value, multiple=False, setdefault=False):
+    assert isinstance(key, str) and isinstance(value, str)
+    if '\n' in key or '\r' in key or '\n' in value or '\r' in value:
+        raise ValueError('invalid characters in header')
+    if not multiple:
+        for idx, (k, v) in enumerate(headers):
+            if k.lower() == key.lower():
+                if not setdefault:
+                    headers[idx] = (key, value)
+                return
+    headers.append((key, value))
 
 
 def make_cookie(name, value, expires='', path='', domain=None, secure=False, httponly=False):

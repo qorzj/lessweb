@@ -193,12 +193,12 @@ class Application(object):
         except HttpError as e:
             ctx.status_code = e.status_code
             ctx.reason = e.reason
-            ctx.headers = {(k,v):1 for k,v in e.headers.items()}
+            ctx.headers = e.headers
             return e.text
         except (NeedParamError, BadParamError) as e:
             ctx.status_code = 400
             ctx.reason = 'Bad Request'
-            ctx.headers = {('Content-Type', 'text/html; charset=' + self.encoding): 1}
+            ctx.headers = [('Content-Type', 'text/html; charset=' + self.encoding)]
             return repr(e)
 
     def add_interceptor(self, pattern, method, dealer):
@@ -328,13 +328,13 @@ class Application(object):
                     elif r is None:
                         yield b''
                     else:
-                        ctx.set_header('Content-Type', 'application/json')
+                        ctx.set_header('Content-Type', 'application/json; charset=' + self.encoding, setdefault=True)
                         yield json_dumps(r, _make_default_json_encoders()).encode(self.encoding)
 
             result = _2_build_result(result)
             status = '{0} {1}'.format(ctx.status_code, ctx.reason)
-            ctx.set_header_default('Content-Type', 'text/html; charset=' + self.encoding)
-            headers = list(ctx.headers.keys())
+            ctx.set_header('Content-Type', 'text/html; charset=' + self.encoding, setdefault=True)
+            headers = list(ctx.headers)
             start_resp(status, headers)
             return itertools.chain(result, (b'',))
 

@@ -12,7 +12,7 @@ from io import BytesIO
 
 from lessweb.storage import Storage
 from lessweb.webapi import UploadedFile, HttpError, mimetypes, hop_by_hop_headers
-from lessweb.webapi import make_cookie, parse_cookie
+from lessweb.webapi import make_cookie, parse_cookie, set_header
 from lessweb.utils import _nil, fields_in_query
 
 
@@ -64,7 +64,7 @@ class Context(object):
     def __init__(self, app=None) -> None:
         self.status_code: int = 200
         self.reason: str = 'OK'
-        self.headers: Dict = {}
+        self.headers: List = []
         self.app_stack: List = []
         self.app = app
         self.view = None
@@ -99,21 +99,8 @@ class Context(object):
     def get_param(self, realname, default=None):
         return self._pipe.get(realname, default)
 
-    def set_header(self, header, value):
-        """
-        Example:
-
-        """
-        assert isinstance(header, str) and isinstance(value, str)
-        if '\n' in header or '\r' in header or '\n' in value or '\r' in value:
-            raise ValueError('invalid characters in header')
-        self.headers[header, value] = 1
-
-    def set_header_default(self, header, value):
-        for k, v in self.headers.keys():
-            if k.lower() == header.lower():
-                return
-        self.set_header(header, value)
+    def set_header(self, header, value, multiple=False, setdefault=False):
+        set_header(self.headers, header, value, multiple=multiple, setdefault=setdefault)
 
     def get_header(self, header, default=None):
         """
@@ -188,7 +175,7 @@ class Context(object):
         """Set a cookie."""
         path = path or self.homepath + '/'
         value = make_cookie(name, value, expires, path, domain, secure, httponly)
-        self.set_header('Set-Cookie', value)
+        self.set_header('Set-Cookie', value, multiple=True)
 
     def get_cookie(self):
         """Get cookies --> Dict"""
