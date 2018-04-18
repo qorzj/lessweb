@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from lessweb.webapi import HttpError, NotFound, NoMethod, NeedParamError, BadParamError
 from lessweb.webapi import http_methods
 from lessweb.context import Context
-from lessweb.model import fetch_param, Model
+from lessweb.model import fetch_param, Model, Jsonable
 from lessweb.storage import Storage
 from lessweb.utils import eafp, json_dumps, re_standardize
 
@@ -100,6 +100,11 @@ def interceptor(dealer):
 
 
 def _make_default_json_encoders(jsonizers):
+    def _jsonable_encoder(obj:Jsonable):
+        if hasattr(obj, 'lessweb_jsonize'):
+            return obj.lessweb_jsonize()
+        return obj.jsonize()
+
     def _datetime_encoder(obj:datetime):
         return obj.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -112,7 +117,7 @@ def _make_default_json_encoders(jsonizers):
         else:
             return obj.value
 
-    return [*jsonizers, _datetime_encoder, _model_encoder, _enum_encoder]
+    return [*jsonizers, _jsonable_encoder, _datetime_encoder, _model_encoder, _enum_encoder]
 
 
 class Application(object):

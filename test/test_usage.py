@@ -1,5 +1,7 @@
+from enum import Enum
+
 from unittest import TestCase
-from lessweb import Application, interceptor, Context
+from lessweb import Application, interceptor, Context, Model, RestParam, Jsonable
 from lessweb.utils import _nil
 
 
@@ -73,6 +75,46 @@ class TestUsage(TestCase):
         app.add_mapping('/add/{a}/{b}', 'GET', add1)
         with app.test_get('/add/x/2') as ret:
             self.assertEquals(ret, {'ans': 'x2'})
+
+    def test_param_and_jsonize(self):
+        class Gender(Enum):
+            MALE = 1
+            FEMALE = 2
+
+        Gender.MALE.show = 'male'
+        Gender.FEMALE.show = 'female'
+
+
+        class Long(int):
+            pass
+
+        def _user(ctx:Context, g:Gender, x:Long, n:int):
+            return dict(g=g, x=x, n=n)
+
+        app = Application()
+        app.add_get_mapping('/user', _user)
+        with app.test_get('/user', {'g': 2, 'x': -1, 'n': -2}) as ret:
+            self.assertEquals(ret, {'g':{'value': 2, 'show': 'female'}, 'x':-1, 'n':0})
+
+        class Pair(RestParam, Jsonable):
+            def eval_from_text(self, text):
+                self.p, self.q = text.split('_', 1)
+            def jsonize(self):
+                return [self.p, self.q]
+
+        class User(Model):
+            G: Gender
+            X: Long
+            N: int
+            P: Pair
+
+        def _user(ctx: Context, u: User):
+            return [u]
+
+        app = Application()
+        app.add_get_mapping('/user', _user)
+        with app.test_get('/user', {'G': 1, 'X': 2, 'N': 1, 'P': '9_8'}) as ret:
+            self.assertEquals(ret, [{'G': {'value': 1, 'show': 'male'}, 'X': 2, 'N': 1, 'P': ['9', '8']}])
 
     def test_need_param(self):
         app = Application()
