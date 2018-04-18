@@ -27,6 +27,11 @@ def json_dumps(obj, encoders=()):
 
     class _1_Encoder(json.JSONEncoder):
         def default(self, obj):
+            if hasattr(obj, 'lessweb_jsonize'):
+                return obj.lessweb_jsonize()
+            elif hasattr(obj, 'jsonize'):
+                return obj.jsonize()
+
             for f in encoders:
                 t = get_type_hints(f)
                 if 'return' in t: t.pop('return')

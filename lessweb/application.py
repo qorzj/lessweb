@@ -99,7 +99,7 @@ def interceptor(dealer):
     return _1_wrapper
 
 
-def _make_default_json_encoders():
+def _make_default_json_encoders(jsonizers):
     def _datetime_encoder(obj:datetime):
         return obj.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -107,9 +107,12 @@ def _make_default_json_encoders():
         return obj.storage()
 
     def _enum_encoder(obj:Enum):
-        return obj.value
+        if hasattr(obj, 'show'):
+            return dict(value=obj.value, show=obj.show)
+        else:
+            return obj.value
 
-    return [_datetime_encoder, _model_encoder, _enum_encoder]
+    return [*jsonizers, _datetime_encoder, _model_encoder, _enum_encoder]
 
 
 class Application(object):
@@ -127,6 +130,7 @@ class Application(object):
     def __init__(self, encoding='utf-8', debug=True) -> None:
         self.mapping = []
         self.interceptors = []
+        self.jsonizers = []
         self.encoding: str = encoding
         self.debug: bool = debug
 
@@ -286,6 +290,9 @@ class Application(object):
     def add_put_mapping(self, pattern, dealer, doc='', view=None, querynames='*'):
         return self.add_mapping(pattern, 'PUT', dealer, doc, view, querynames)
 
+    def add_jsonizer(self, jsonizer):
+        self.jsonizers.append(jsonizer)
+
     def wsgifunc(self, *middleware):
         """
             Example:
@@ -329,7 +336,7 @@ class Application(object):
                         yield b''
                     else:
                         ctx.set_header('Content-Type', 'application/json; charset=' + self.encoding, setdefault=True)
-                        yield json_dumps(r, _make_default_json_encoders()).encode(self.encoding)
+                        yield json_dumps(r, _make_default_json_encoders(self.jsonizers)).encode(self.encoding)
 
             result = _2_build_result(result)
             status = '{0} {1}'.format(ctx.status_code, ctx.reason)
