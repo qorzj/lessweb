@@ -116,6 +116,15 @@ class TestUsage(TestCase):
         with app.test_get('/user', {'G': 1, 'X': 2, 'N': 1, 'P': '9_8'}) as ret:
             self.assertEquals(ret, [{'G': {'value': 1, 'show': 'male'}, 'X': 2, 'N': 1, 'P': ['9', '8']}])
 
+        def jsonize_int(x:set):
+            return str(x)+'!'
+
+        app = Application()
+        app.add_get_mapping('/int', lambda: {'code': set()})
+        app.add_jsonizer(jsonize_int)
+        with app.test_get('/int') as ret:
+            self.assertEquals(ret, {'code': 'set()!'})
+
     def test_need_param(self):
         app = Application()
         app.add_mapping('/add', 'GET', add3)

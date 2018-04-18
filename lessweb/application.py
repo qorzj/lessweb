@@ -340,7 +340,6 @@ class Application(object):
                     elif r is None:
                         yield b''
                     else:
-                        ctx.set_header('Content-Type', 'application/json; charset=' + self.encoding, setdefault=True)
                         yield json_dumps(r, _make_default_json_encoders(self.jsonizers)).encode(self.encoding)
 
             result = _2_build_result(result)

@@ -103,6 +103,16 @@ class Context(object):
     def set_header(self, header, value, multiple=False, setdefault=False):
         set_header(self.headers, header, value, multiple=multiple, setdefault=setdefault)
 
+    def set_json_header(self):
+        self.set_header('Content-Type', 'application/json; charset=' + self.app.encoding, setdefault=True)
+
+    def set_access_allow_header(self, headers=('token',)):
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS')
+        self.set_header('Access-Control-Allow-Origin', '*')
+        self.set_header('Access-Control-Allow-Headers',
+                       'Cache-Control, Accept-Encoding, %s, uid, Origin, X-Requested-With, Content-Type, Accept, '
+                       'Authorization, Referer, User-Agent' % (', '.join(headers)))
+
     def get_header(self, header, default=None):
         """
         Example:
