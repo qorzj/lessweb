@@ -96,7 +96,7 @@ class TestUsage(TestCase):
         with app.test_get('/user', {'g': 2, 'x': -1, 'n': -2}) as ret:
             self.assertEquals(ret, {'g':{'value': 2, 'show': 'female'}, 'x':-1, 'n':0})
 
-        class Pair(RestParam, Jsonable):
+        class Pair(RestParam):
             def eval_from_text(self, text):
                 self.p, self.q = text.split('_', 1)
             def jsonize(self):

@@ -12,10 +12,10 @@ from lessweb.storage import Storage
 
 class Jsonable:
     def jsonize(self):
-        return {}
+        return str(self)
 
 
-class RestParam:
+class RestParam(Jsonable):
     def eval_from_text(self, text):
         return
 
