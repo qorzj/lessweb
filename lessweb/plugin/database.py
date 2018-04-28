@@ -4,17 +4,16 @@ from urllib.parse import quote
 
 from contextlib import contextmanager
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import Session
 from sqlalchemy.exc import InterfaceError
 from sqlalchemy.ext.declarative import declarative_base
 
-from ..application import interceptor
 from ..context import Context
 from ..storage import Storage
 from ..model import Model
 
-__all__ = ["global_data", "DbModel", "init", "processor", "create_all", "make_session", "will_commit", "dumpall"]
+__all__ = ["global_data", "DbModel", "init", "processor", "create_all", "make_session", "dumpall"]
 
 
 class GlobalData:
@@ -24,7 +23,7 @@ class GlobalData:
 
 class DatabaseCtx(Context):
     db : Session
-    will_commit: bool
+
 
 global_data = GlobalData()
 
@@ -75,7 +74,8 @@ def init(*, dburi, echo: bool=True): ...
 def init(*, protocol, username, password, host, port:int, entity, echo:bool=True): ...
 
 
-def init(*, protocol=None, username=None, password=None, host=None, port:int=None, entity=None, dburi=None, echo:bool=True):
+def init(*, protocol=None, username=None, password=None, host=None, port:int=None, entity=None, dburi=None,
+         echo:bool=True, autoflush=True, autocommit=False):
     """
     Database requirements:
         sqlalchemy
@@ -98,33 +98,28 @@ def init(*, protocol=None, username=None, password=None, host=None, port:int=Non
             pool_recycle=3600
         )
     engine.echo = echo
-    global_data.db_session_maker = sessionmaker(bind=engine)
+    global_data.db_session_maker = scoped_session(sessionmaker(
+        autoflush=autoflush, autocommit=autocommit, bind=engine))
     global_data.db_engine = engine
-
-
-@interceptor
-def will_commit(ctx: DatabaseCtx):
-    ret = ctx()
-    ctx.will_commit = True
-    return ret
 
 
 def processor(ctx: DatabaseCtx):
     try:
         ctx.db = global_data.db_session_maker()
-        ctx.will_commit = False
         ret = ctx()
-        if ctx.will_commit:
-            ctx.db.commit()
+        return ret
     except:
         ctx.db.rollback()
         raise
     finally:
         ctx.db.close()
-    return ret
 
 
 def create_all(*DbModelClass):
+    """
+    init(...)
+    create_all(DbUser, DbOrder, ...)
+    """
     for db_class in DbModelClass:
         db_class.metadata.create_all(global_data.db_engine)
 
