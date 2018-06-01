@@ -19,7 +19,5 @@ app.add_get_mapping('/', hello)
 app.run()
 ```
 
-## 完整示例（简易留言板）：
-### https://github.com/qorzj/reply-board
-
-只支持python3.6.0以上版本（目前python3.7有bug）
+## 文档：
+### http://lessweb.org
