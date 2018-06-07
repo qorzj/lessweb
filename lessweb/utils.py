@@ -43,12 +43,12 @@ def re_standardize(pattern):
     """
         >>> pattern = re_standardize('/add/{x}/{y}')
         >>> pattern
-        '^/add/(?P<x>[^/]*)/(?P<y>[^/]*)$'
+        '^/add/(?P<x>[0-9]+)/(?P<y>[0-9]+)$'
 
         >>> re.search(pattern, '/add/234/5').groupdict()
         {'x': '234', 'y': '5'}
-        >>> re.search(pattern, '/add//add').groupdict()
-        {'x': '', 'y': 'add'}
+        >>> re.search(pattern, '/add//add') is None
+        True
         >>> re.search(pattern, '/add/1/2/') is None
         True
 
@@ -61,7 +61,7 @@ def re_standardize(pattern):
         pattern = pattern + '$'
     def _repl(obj):
         x = obj.groups()[0]
-        return '(?P<%s>[^/]*)' % x
+        return '(?P<%s>[0-9]+)' % x
 
     return re.sub(r'\{([^0-9].*?)\}', _repl, pattern)
 
@@ -87,19 +87,3 @@ def fields_in_query(query):
         k, v = seg.split('=', 1)
         ret[k] = v
     return ret
-
-
-class AnyEnum:
-    def __init__(self, name=None):
-        self.name = name
-
-    def __getattr__(self, x):
-        return AnyEnum(x)
-
-    def __eq__(self, other):
-        if not isinstance(other, Enum):
-            return False
-        return other.name == self.name
-
-
-anyenum = AnyEnum()

@@ -89,6 +89,8 @@ class Model:
         return self is other or (type(self) == type(other) and self.storage() == other.storage())
 
     def __repr__(self):
+        if type(self) is Model:
+            return super().__repr__()
         return '<Model ' + repr(dict(self.storage())) + '>'
 
 

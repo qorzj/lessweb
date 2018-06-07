@@ -56,7 +56,7 @@ def build_controller(dealer):
     """
     把接收多个参数的dealer转变成只接收一个参数(ctx)的函数
 
-        >>> def controller(ctx, id:int, lpn):
+        >>> def controller(ctx:Context, id:int, lpn):
         ...     return {'ctx': ctx, 'id': id, 'lpn': lpn}
         >>> ctx = Context()
         >>> ctx._fields = dict(id='5', lpn='HK888', pageNo='3')
@@ -75,11 +75,11 @@ def interceptor(dealer):
     为controller添加interceptor的decorator
     在dealer函数中调用ctx()，就会执行它修饰的controller
 
-        >>> def dealer(ctx, id:int, pageNo:int):
+        >>> def dealer(ctx:Context, id:int, pageNo:int):
         ...     assert id == 5 and pageNo == 3, (id, pageNo)
         ...     return list(ctx())
         >>> @interceptor(dealer)
-        ... def controller(ctx, id:int, lpn):
+        ... def controller(ctx:Context, id:int, lpn):
         ...     return {'ctx': ctx, 'id': id, 'lpn': lpn}
         >>> ctx = Context()
         >>> ctx._fields = dict(id='5', lpn='HK888', pageNo='3')

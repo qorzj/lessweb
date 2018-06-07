@@ -73,6 +73,12 @@ class _Redirect(HttpError):
         super().__init__(status_code=status_code, text='', headers=headers)
 
 
+class MovedPermanently(_Redirect):
+    def __init__(self, url, headers=None):
+        headers = headers or []
+        super().__init__(status_code=301, fullurl=url, headers=headers)
+
+
 class Found(_Redirect):
     def __init__(self, url, headers=None):
         headers = headers or []

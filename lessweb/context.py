@@ -139,6 +139,8 @@ class Context(object):
                 self.json_input = json.loads(self.data().decode(self.app.encoding))
             except:
                 self.json_input = {'__error__': 'invalid json received'}
+            if not isinstance(self.json_input, dict):
+                self.json_input = {'__error__': 'invalid json received (not dict)'}
             return self.json_input
         else:
             try:

@@ -72,7 +72,7 @@ class TestUsage(TestCase):
             self.assertEquals(ret, {'ans': '[/add:ab]'})
 
         app = Application()
-        app.add_mapping('/add/{a}/{b}', 'GET', add1)
+        app.add_mapping('/add/(?P<a>[a-z]*)/{b}', 'GET', add1)
         with app.test_get('/add/x/2') as ret:
             self.assertEquals(ret, {'ans': 'x2'})
 
@@ -224,5 +224,5 @@ class TestUsage(TestCase):
         app.add_delete_mapping('/del/{a}/{b}', show_method)
         with app.test_delete('/add/del?a=2&b=3') as ret:
             self.assertEquals(ret, {'ans': '[DELETE23]'})
-        with app.test_delete('/del/1/') as ret:
-            self.assertEquals(ret, {'ans': 'DELETE1'})
+        with app.test_delete('/del/1/2') as ret:
+            self.assertEquals(ret, {'ans': 'DELETE12'})

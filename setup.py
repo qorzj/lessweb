@@ -25,7 +25,7 @@ setup(
         version=version,
         description='Web framework for python3.6+ 「嘞是web」',
         long_description='\nREADME: https://github.com/qorzj/lessweb\n\n'
-                         'Usage Example: https://github.com/qorzj/reply-board',
+                         'Cookbook: http://lessweb.org',
         url='https://github.com/qorzj/lessweb',
         author='qorzj',
         author_email='inull@qq.com',

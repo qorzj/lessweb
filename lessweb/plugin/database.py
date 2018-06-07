@@ -69,9 +69,9 @@ dumpall = DumpAllDbModel()
 
 
 @overload
-def init(*, dburi, echo: bool=True): ...
+def init(*, dburi, echo=True, autoflush=True, autocommit=False): ...
 @overload
-def init(*, protocol, username, password, host, port:int, entity, echo:bool=True): ...
+def init(*, protocol, username, password, host, port:int, entity, echo=True, autoflush=True, autocommit=False): ...
 
 
 def init(*, protocol=None, username=None, password=None, host=None, port:int=None, entity=None, dburi=None,
@@ -119,7 +119,11 @@ def create_all(*DbModelClass):
     """
     init(...)
     create_all(DbUser, DbOrder, ...)
+    create_all([DbUser, DbOrder, ...])
     """
+    if len(DbModelClass) == 1 and isinstance(DbModelClass[0], (list, tuple)):
+        return create_all(*DbModelClass[0])
+
     for db_class in DbModelClass:
         db_class.metadata.create_all(global_data.db_engine)
 
