@@ -20,5 +20,9 @@ def init(host, port, db=0):
 
 
 def processor(ctx: RedisCtx):
-    ctx.redis = Redis(connection_pool=global_data.redis_pool)
+    ctx.redis = session()
     return ctx()
+
+
+def session():
+    return Redis(connection_pool=global_data.redis_pool)
