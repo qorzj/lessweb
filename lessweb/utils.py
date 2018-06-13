@@ -1,7 +1,8 @@
 import json
 import re
-from enum import Enum
 from typing import get_type_hints
+from unittest.mock import Mock
+from .storage import Storage
 
 
 def eafp(ask, default):
@@ -87,3 +88,26 @@ def fields_in_query(query):
         k, v = seg.split('=', 1)
         ret[k] = v
     return ret
+
+
+class ChainMock:
+    """
+    Usage: https://github.com/qorzj/lessweb/wiki/%E7%94%A8mock%E6%B5%8B%E8%AF%95service
+    """
+    def __init__(self):
+        self.returns = {}
+        self.mock = {}
+
+    def set(self, path, return_value):
+        self.returns[path] = return_value
+        self.mock[path] = Mock(return_value=return_value)
+        while '.' in path:
+            prefix, key = path.rsplit('.', 1)
+            if prefix not in self.returns: self.returns[prefix] = Storage()
+            self.returns[prefix][key] = self.mock[path]
+            self.mock[prefix] = Mock(return_value=self.returns[prefix])
+            path = prefix
+        return self
+
+    def __call__(self, path):
+        return self.mock[path]
