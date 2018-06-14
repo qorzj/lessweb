@@ -19,6 +19,7 @@ __all__ = ["global_data", "DbModel", "init", "processor", "create_all", "make_se
 class GlobalData:
     db_session_maker: Any
     db_engine: Any
+    autocommit: bool
 
 
 class DatabaseCtx(Context):
@@ -101,13 +102,17 @@ def init(*, protocol=None, username=None, password=None, host=None, port:int=Non
     global_data.db_session_maker = scoped_session(sessionmaker(
         autoflush=autoflush, autocommit=autocommit, bind=engine))
     global_data.db_engine = engine
+    global_data.autocommit = autocommit
 
 
 def processor(ctx: DatabaseCtx):
     try:
         ctx.db = global_data.db_session_maker()
-        ret = ctx()
-        return ret
+        if global_data.autocommit:
+            with ctx.db.begin():
+                return ctx()
+        else:
+            return ctx()
     except:
         ctx.db.rollback()
         raise
