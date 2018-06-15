@@ -63,10 +63,41 @@ DbModel.__repr__ = lambda self: '<DbModel ' + repr(self.items()) + '>'
 
 class DumpAllDbModel:
     def __ror__(self, other):
+        if other is None:
+            return []
         return [x.dump() for x in other]
 
 
 dumpall = DumpAllDbModel()
+
+
+class DumpPageModel:
+    def __init__(self, pageNo, pageSize):
+        if pageNo < 1: pageNo = 1
+        self.pageNo = pageNo
+        self.pageSize = pageSize
+
+    def __ror__(self, other):
+        if other is None:
+            return []
+        ret = other.offset((self.pageNo - 1) * self.pageSize).limit(self.pageSize).all()
+        if ret is None:
+            return []
+        return [x.dump() for x in ret]
+
+
+def dumppage(pageNo, pageSize):
+    return DumpPageModel(pageNo, pageSize)
+
+
+class DumpOneModel:
+    def __ror__(self, other):
+        if other is None:
+            return None
+        return other.dump()
+
+
+dumpone = DumpOneModel()
 
 
 @overload
