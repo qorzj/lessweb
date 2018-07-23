@@ -134,7 +134,7 @@ class Context(object):
             return self.json_input
         if self._fields is not None:
             return self._fields
-        if self.is_json_request():
+        if self.is_json_request() and self.data():
             try:
                 self.json_input = json.loads(self.data().decode(self.app.encoding))
             except:
