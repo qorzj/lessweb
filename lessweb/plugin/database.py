@@ -1,4 +1,3 @@
-import time
 from typing import Any, overload
 from urllib.parse import quote
 
@@ -6,7 +5,6 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import Session
-from sqlalchemy.exc import InterfaceError
 from sqlalchemy.ext.declarative import declarative_base
 
 from ..context import Context
@@ -53,7 +51,7 @@ def _db_model_copy(self, *mapping, **kwargs):
     return ret
 
 
-DbModel: Model = declarative_base()
+DbModel = declarative_base()
 DbModel.storage = _db_model_storage
 DbModel.setall = _db_model_setall
 DbModel.copy = _db_model_copy

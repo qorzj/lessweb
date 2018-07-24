@@ -182,7 +182,7 @@ class Context(object):
             return _nil
 
         ret = self.url_input.get(queryname, _nil)
-        if ret is not _nil:
+        if ret != _nil:
             return ret
 
         return self.field_input.get(queryname, default)

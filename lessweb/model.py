@@ -5,7 +5,7 @@ from inspect import _empty
 from typing import *
 
 from lessweb.context import Context
-from lessweb.utils import _nil
+from lessweb.utils import _nil, _readonly
 from lessweb.webapi import NeedParamError, BadParamError
 from lessweb.storage import Storage
 
@@ -51,8 +51,12 @@ def get_model_parameters(cls):
     defaults = {
         k: getattr(inst, k, _nil) for k in cls.__dict__
     }
+    for k in cls.__dict__:  # handle read-only property
+        if isinstance(getattr(cls, k), property) and not getattr(cls, k).fset:
+            defaults[k] = _readonly
+
     return [
-        (k, annos.get(k, _nil), defaults.get(k, _nil))
+        (k, annos.get(k, _nil), defaults.get(k, _nil))  # (realname, Type, default)
         for k in
         (lambda x, y: x.update(y) or x)(annos.copy(), defaults)
         if k[0] != '_'
@@ -116,7 +120,7 @@ def input_by_choose(ctx: Context, fn, realname, realtype, default):
     else:
         pre_value = ctx.get_input(queryname, default=_nil)
         try:
-            if pre_value is not _nil:
+            if pre_value != _nil:
                 if not isinstance(realtype, type):
                     value = realtype(pre_value)
                 elif not issubclass(realtype, RestParam):
@@ -145,13 +149,13 @@ def input_by_choose(ctx: Context, fn, realname, realtype, default):
                         else:
                             value.eval_from_text(pre_value)
 
-            else:  # pre_value is _nil
+            else:  # pre_value == _nil
                 value = _nil
         except (ValueError, TypeError) as e:
             raise BadParamError(query=queryname, error=str(e))
 
-    if value is _nil:
-        if default is _nil:
+    if value == _nil:
+        if default == _nil:
             raise NeedParamError(query=queryname, doc=queryname)
         return default
     else:
@@ -174,7 +178,9 @@ def fetch_model_param(ctx: Context, cls, fn):
     """
     result = {}
     for realname, realtype, default in get_model_parameters(cls):
-        if realtype is _nil:
+        if default == _readonly:
+            continue
+        if realtype == _nil:
             realtype = str
         value = input_by_choose(ctx, fn, realname, realtype, default)
         result[realname] = value
@@ -204,7 +210,7 @@ def fetch_param(ctx: Context, fn):
             result[realname] = fetch_model_param(ctx, realtype, fn)
             continue
 
-        if realtype is _nil: realtype = str
+        if realtype == _nil: realtype = str
         value = input_by_choose(ctx, fn, realname, realtype, default)
         result[realname] = value
 

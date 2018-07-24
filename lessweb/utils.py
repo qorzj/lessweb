@@ -1,7 +1,10 @@
+from contextlib import contextmanager
 import json
+from pathlib import Path
+import pickle
 import re
 from typing import get_type_hints
-from unittest.mock import Mock
+from unittest.mock import Mock, DEFAULT
 from .storage import Storage
 
 
@@ -17,11 +20,16 @@ def eafp(ask, default):
 
 
 class Nil:
+    def __init__(self, value):
+        self.value = value
     def __bool__(self):
         return False
+    def __eq__(self, other):
+        return isinstance(other, Nil) and self.value == other.value
 
 
-_nil = Nil()
+_nil = Nil(0)
+_readonly = Nil(1)
 
 
 def json_dumps(obj, encoders=()):
@@ -94,11 +102,14 @@ class ChainMock:
     """
     Usage: https://github.com/qorzj/lessweb/wiki/%E7%94%A8mock%E6%B5%8B%E8%AF%95service
     """
-    def __init__(self):
+    def __init__(self, path, return_value):
         self.returns = {}
         self.mock = {}
+        self.join(path, return_value)
 
-    def set(self, path, return_value):
+    def join(self, path, return_value):
+        if not path.startswith('.'):
+            path = '.' + path
         self.returns[path] = return_value
         self.mock[path] = Mock(return_value=return_value)
         while '.' in path:
@@ -109,5 +120,47 @@ class ChainMock:
             path = prefix
         return self
 
-    def __call__(self, path):
+    def __call__(self, path=None):
+        if path is None:
+            return self.mock['']()
+        if not path.startswith('.'):
+            path = '.' + path
         return self.mock[path]
+
+
+class StaticDict(dict):
+    touched = False
+
+    def __delitem__(self, key):
+        super().__delitem__(key)
+        self.touched = True
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self.touched = True
+
+    def update(self, *E, **F):
+        super().update(*E, **F)
+        self.touched = True
+
+    def pop(self, *k):
+        ret = super().pop(*k)
+        self.touched = True
+        return ret
+
+
+@contextmanager
+def static_dict(path):
+    is_json = path.lower().endswith('.json')
+    path = Path(path)
+    if is_json:
+        data = StaticDict(json.load(path.open('r'))) if path.exists() else StaticDict()
+    else:
+        data = StaticDict(pickle.load(path.open('rb'))) if path.exists() else StaticDict()
+    yield data
+    if data.touched:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if is_json:
+            json.dump(data, path.open('w'))
+        else:
+            pickle.dump(data, path.open('wb'))
