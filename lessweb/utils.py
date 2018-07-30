@@ -4,6 +4,7 @@ from pathlib import Path
 import pickle
 import re
 from typing import get_type_hints
+from typing import TypeVar, Generic
 from unittest.mock import Mock, DEFAULT
 from .storage import Storage
 
@@ -22,14 +23,23 @@ def eafp(ask, default):
 class Nil:
     def __init__(self, value):
         self.value = value
+
     def __bool__(self):
         return False
+
     def __eq__(self, other):
         return isinstance(other, Nil) and self.value == other.value
 
 
 _nil = Nil(0)
 _readonly = Nil(1)
+
+
+T = TypeVar('T')
+class Service(Generic[T]):
+    ctx: T
+    def __init__(self, ctx: T = None):
+        self.ctx = ctx
 
 
 def json_dumps(obj, encoders=()):

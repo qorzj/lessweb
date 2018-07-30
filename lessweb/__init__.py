@@ -1,7 +1,7 @@
 """lessweb: 用最python3的方法创建web apps"""
 
 
-__version__ = '0.1.25'
+__version__ = '0.1.26'
 __author__ = [
     'qorzj <inull@qq.com>',
 ]
@@ -19,4 +19,4 @@ from .webapi import HttpError, MovedPermanently, Found, SeeOther, NotModified, T
     BadRequest, Unauthorized, Forbidden, NotFound, NoMethod, NotAcceptable, Conflict, Gone, \
     PreconditionFailed, UnsupportedMediaType, UnavailableForLegalReasons, InternalError
 from .webapi import UploadedFile, status_table, NeedParamError, BadParamError
-from .utils import eafp, json_dumps, ChainMock
+from .utils import _nil, Service, eafp, json_dumps, ChainMock

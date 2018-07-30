@@ -1,4 +1,4 @@
-from typing import Any, overload
+from typing import Any, overload, List
 from urllib.parse import quote
 
 from contextlib import contextmanager
@@ -9,7 +9,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from ..context import Context
 from ..storage import Storage
-from ..model import Model
+from ..model import Model, PagedList
 
 __all__ = ["global_data", "DbModel", "init", "processor", "create_all", "make_session", "dumpall"]
 
@@ -60,7 +60,7 @@ DbModel.__repr__ = lambda self: '<DbModel ' + repr(self.items()) + '>'
 
 
 class DumpAllDbModel:
-    def __ror__(self, other):
+    def __ror__(self, other) -> List:
         if other is None:
             return []
         return [x.dump() for x in other]
@@ -72,16 +72,25 @@ dumpall = DumpAllDbModel()
 class DumpPageModel:
     def __init__(self, pageNo, pageSize):
         if pageNo < 1: pageNo = 1
+        assert pageSize >= 1, pageSize
         self.pageNo = pageNo
         self.pageSize = pageSize
 
-    def __ror__(self, other):
+    def __ror__(self, other) -> PagedList:
+        pagelist = PagedList()
+        pagelist.pageNo = self.pageNo
+        pagelist.pageSize = self.pageSize
+
         if other is None:
-            return []
-        ret = other.offset((self.pageNo - 1) * self.pageSize).limit(self.pageSize).all()
-        if ret is None:
-            return []
-        return [x.dump() for x in ret]
+            return pagelist
+
+        totalNum = other.count()
+        dbitems = other.offset((self.pageNo - 1) * self.pageSize).limit(self.pageSize).all()
+
+        if totalNum > 0:
+            pagelist.extend(x.dump() for x in dbitems)
+            pagelist.totalNum = totalNum
+        return pagelist
 
 
 def dumppage(pageNo, pageSize):

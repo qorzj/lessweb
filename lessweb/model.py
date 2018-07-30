@@ -5,7 +5,7 @@ from inspect import _empty
 from typing import *
 
 from lessweb.context import Context
-from lessweb.utils import _nil, _readonly
+from lessweb.utils import _nil, _readonly, Service
 from lessweb.webapi import NeedParamError, BadParamError
 from lessweb.storage import Storage
 
@@ -21,6 +21,23 @@ class RestParam(Jsonable):
 
     def eval_from_json(self, obj):
         return
+
+
+class PagedList(list, Jsonable):
+    pageNo: int = 1
+    pageSize: int = 1
+    totalNum: int = 0
+
+    @property
+    def totalPage(self):
+        d, m = divmod(self.totalNum, self.pageSize)
+        return max(1, d) if m == 0 else d + 1
+
+    def jsonize(self):
+        return {
+            'list': self, 'pageNo': self.pageNo, 'pageSize': self.pageSize,
+            'totalNum': self.totalNum, 'totalPage': self.totalPage
+        }
 
 
 def get_func_parameters(func):
@@ -109,10 +126,6 @@ def input_by_choose(ctx: Context, fn, realname, realtype, default):
         >>> [input_by_choose(ctx, foo, k, realtype=str, default=None) for k in 'abcde']
         ['A', 'B', 'C', None, None]
     """
-    # if ctx.is_json_request():
-    #     getter = rest_param.jsongetter or rest_param.getter
-    # else:
-    #     getter = rest_param.getter
     queryname = ctx.aliases.get(realname, realname)
 
     if realname in ctx._pipe:
@@ -202,13 +215,18 @@ def fetch_param(ctx: Context, fn):
     """
     result = {}
     for realname, realtype, default in get_func_parameters(fn):
-        if isinstance(realtype, type) and issubclass(realtype, Context):
-            result[realname] = ctx
-            continue
+        if isinstance(realtype, type):
+            if issubclass(realtype, Context):
+                result[realname] = ctx
+                continue
 
-        if isinstance(realtype, type) and issubclass(realtype, Model):
-            result[realname] = fetch_model_param(ctx, realtype, fn)
-            continue
+            if issubclass(realtype, Service):
+                result[realname] = realtype(ctx)
+                continue
+
+            if issubclass(realtype, Model):
+                result[realname] = fetch_model_param(ctx, realtype, fn)
+                continue
 
         if realtype == _nil: realtype = str
         value = input_by_choose(ctx, fn, realname, realtype, default)
