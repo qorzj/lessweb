@@ -88,7 +88,7 @@ class DumpPageModel:
         dbitems = other.offset((self.pageNo - 1) * self.pageSize).limit(self.pageSize).all()
 
         if totalNum > 0:
-            pagelist.extend(x.dump() for x in dbitems)
+            pagelist.list.extend(x.dump() for x in dbitems)
             pagelist.totalNum = totalNum
         return pagelist
 

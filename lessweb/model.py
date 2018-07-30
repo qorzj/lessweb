@@ -23,19 +23,23 @@ class RestParam(Jsonable):
         return
 
 
-class PagedList(list, Jsonable):
+class PagedList(Jsonable):
     pageNo: int = 1
     pageSize: int = 1
     totalNum: int = 0
+    list: List = None
 
     @property
     def totalPage(self):
         d, m = divmod(self.totalNum, self.pageSize)
         return max(1, d) if m == 0 else d + 1
 
+    def __init__(self):
+        self.list = []
+
     def jsonize(self):
         return {
-            'list': self, 'pageNo': self.pageNo, 'pageSize': self.pageSize,
+            'list': self.list, 'pageNo': self.pageNo, 'pageSize': self.pageSize,
             'totalNum': self.totalNum, 'totalPage': self.totalPage
         }
 
