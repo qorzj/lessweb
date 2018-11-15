@@ -127,7 +127,7 @@ def init(*, protocol=None, username=None, password=None, host=None, port:int=Non
 
     """
     if dburi:
-        engine = create_engine(dburi)
+        engine = create_engine(dburi, pool_recycle=3600)
     else:
         engine = create_engine(
             '{protocol}://{username}:{password}@{host}:{port}/{entity}'.format(
