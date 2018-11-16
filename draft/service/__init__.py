@@ -48,9 +48,9 @@ def realvalue_of(ctx: Context, input_value: Union[Jsonizable, UploadedFile], tar
         if target != UploadedFile:
             raise BadParamError
         return input_value
-    elif target == List or generic_origin(target) == List:
+    elif target == List or generic_origin(target) == list:
         return [realvalue_of(ctx, x, list_core(target)) for x in input_value]
-    elif target == Tuple or generic_origin(target) == Tuple:
+    elif target == Tuple or generic_origin(target) == tuple:
         return tuple(realvalue_of(ctx, x, tuple_core(target)) for x in input_value)
     elif target == Any:
         return input_value

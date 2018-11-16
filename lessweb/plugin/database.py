@@ -5,13 +5,11 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import Session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative import as_declarative, declared_attr
 
 from ..context import Context
-from ..storage import Storage
-from ..model import Model, PagedList
 
-__all__ = ["global_data", "DbModel", "init", "processor", "create_all", "make_session", "dumpall"]
+__all__ = ["global_data", "DbModel", "init", "processor", "create_all", "make_session"]
 
 
 class GlobalData:
@@ -27,93 +25,23 @@ class DatabaseCtx(Context):
 global_data = GlobalData()
 
 
-def _db_model_storage(self):
-    return Storage({k: v for k, v in self.__dict__.items() if k[0] != '_'})
+@as_declarative()
+class DbModel(object):
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__
 
-
-def _db_model_setall(self, *mapping, **kwargs):
-    if mapping:
-        _db_model_setall(self, **mapping[0])
-    for k, v in kwargs.items():
-        if k[0] != '_':
-            try:
-                setattr(self, k, v)
-            except AttributeError:  # property without setter
-                pass
-
-
-def _db_model_copy(self, *mapping, **kwargs):
-    ret = self.__class__()
-    ret.setall(**self.storage())
-    if mapping:
-        ret.setall(**mapping[0])
-    ret.setall(**kwargs)
-    return ret
-
-
-DbModel = declarative_base()
-DbModel.storage = _db_model_storage
-DbModel.setall = _db_model_setall
-DbModel.copy = _db_model_copy
-DbModel.__eq__ = lambda self, other: self is other or (type(self) == type(other) and self.items() == other.items())
-DbModel.__repr__ = lambda self: '<DbModel ' + repr(self.items()) + '>'
-
-
-class DumpAllDbModel:
-    def __ror__(self, other) -> List:
-        if other is None:
-            return []
-        return [x.dump() for x in other]
-
-
-dumpall = DumpAllDbModel()
-
-
-class DumpPageModel:
-    def __init__(self, pageNo, pageSize):
-        if pageNo < 1: pageNo = 1
-        assert pageSize >= 1, pageSize
-        self.pageNo = pageNo
-        self.pageSize = pageSize
-
-    def __ror__(self, other) -> PagedList:
-        pagelist = PagedList()
-        pagelist.pageNo = self.pageNo
-        pagelist.pageSize = self.pageSize
-
-        if other is None:
-            return pagelist
-
-        totalNum = other.count()
-        dbitems = other.offset((self.pageNo - 1) * self.pageSize).limit(self.pageSize).all()
-
-        if totalNum > 0:
-            pagelist.list.extend(x.dump() for x in dbitems)
-            pagelist.totalNum = totalNum
-        return pagelist
-
-
-def dumppage(pageNo, pageSize):
-    return DumpPageModel(pageNo, pageSize)
-
-
-class DumpOneModel:
-    def __ror__(self, other):
-        if other is None:
-            return None
-        return other.dump()
-
-
-dumpone = DumpOneModel()
+    def __repr__(self):
+        return '<DbModel ' + repr(list(self.__dict__.items())) + '>'
 
 
 @overload
 def init(*, dburi, echo=True, autoflush=True, autocommit=False): ...
 @overload
-def init(*, protocol, username, password, host, port:int, entity, echo=True, autoflush=True, autocommit=False): ...
+def init(*, protocol, username, password, host, port:int, database, echo=True, autoflush=True, autocommit=False): ...
 
 
-def init(*, protocol=None, username=None, password=None, host=None, port:int=None, entity=None, dburi=None,
+def init(*, protocol=None, username=None, password=None, host=None, port:int=None, database=None, dburi=None,
          echo:bool=True, autoflush=True, autocommit=False):
     """
     Database requirements:
@@ -130,9 +58,9 @@ def init(*, protocol=None, username=None, password=None, host=None, port:int=Non
         engine = create_engine(dburi, pool_recycle=3600)
     else:
         engine = create_engine(
-            '{protocol}://{username}:{password}@{host}:{port}/{entity}'.format(
+            '{protocol}://{username}:{password}@{host}:{port}/{database}'.format(
                 protocol=protocol, username=quote(username), password=quote(password),
-                host=host, port=port, entity=entity
+                host=host, port=port, database=database
             ),
             pool_recycle=3600
         )
