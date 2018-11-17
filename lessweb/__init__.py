@@ -1,7 +1,7 @@
 """lessweb: 用最python3的方法创建web apps"""
 
 
-__version__ = '0.1.27'
+__version__ = '0.1.28'
 __author__ = [
     'qorzj <inull@qq.com>',
 ]
