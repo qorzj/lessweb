@@ -36,7 +36,7 @@ setup(
             ],
         keywords='lessweb web web.py',
         packages = ['lessweb', 'lessweb.plugin'],
-        install_requires=['aiohttp', 'aiohttp_wsgi', 'requests'],
+        install_requires=['aiohttp', 'aiohttp_wsgi', 'requests', 'typing_extensions'],
 
         cmdclass={'install': MyInstall},
         entry_points={

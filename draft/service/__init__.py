@@ -49,9 +49,15 @@ def realvalue_of(ctx: Context, input_value: Union[Jsonizable, UploadedFile], tar
             raise BadParamError
         return input_value
     elif target == List or generic_origin(target) == list:
-        return [realvalue_of(ctx, x, list_core(target)) for x in input_value]
+        if isinstance(input_value, Iterable):
+            return [realvalue_of(ctx, x, list_core(target)) for x in input_value]
+        else:
+            raise BadParamError
     elif target == Tuple or generic_origin(target) == tuple:
-        return tuple(realvalue_of(ctx, x, tuple_core(target)) for x in input_value)
+        if isinstance(input_value, Iterable):
+            return tuple(realvalue_of(ctx, x, tuple_core(target)) for x in input_value)
+        else:
+            raise BadParamError
     elif target == Any:
         return input_value
     else:
@@ -67,7 +73,7 @@ def inject_function(ctx: Context, dealer: Callable) -> Any:
     """
     params = {}
     realnames = realnames_of(ctx)
-    for realname, (optional, typehint) in InspectSpecItem.inspect(dealer):
+    for realname, (optional, typehint) in InspectSpecItem.inspect(dealer).items():
         if realname in realnames:
             # realvalue = cast(Any, [ctx, realname, typehint])
             input_value = input_value_of(ctx, realname)

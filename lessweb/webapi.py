@@ -1,5 +1,7 @@
 from http.cookies import Morsel, SimpleCookie, CookieError
 from urllib.parse import unquote, quote
+from enum import Enum
+from typing import NamedTuple
 
 
 mimetypes = {
@@ -48,9 +50,29 @@ status_table = {
 
 
 class UploadedFile:
+    filename: str
+    value: bytes
+
     def __init__(self, upfile):
         self.filename = upfile.filename
         self.value = upfile.value
+
+
+class HttpStatus(Enum):
+    class Status(NamedTuple):
+        code: int
+        reason: str
+
+    @staticmethod
+    def of(code: int) -> 'HttpStatus':
+        for status in HttpStatus:
+            if status.value.code == code:
+                return status
+        raise NotImplementedError(f'HTTP status {code} is not implemented.')
+
+    OK = Status(code=200, reason='OK')
+    Created = Status(code=201, reason='Created')
+    Accepted = Status(code=202, reason='Accepted')
 
 
 # HTTPError and subclasses

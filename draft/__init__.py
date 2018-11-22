@@ -1,0 +1,1 @@
+# MYPYPATH=../sqlalchemy-stubs mypy .

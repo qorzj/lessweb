@@ -33,9 +33,9 @@ class UploadedFile:
 
 class Cookie:
     value: str
-    expires: int = None
-    path: str = None
-    domain: str = None
+    expires: Optional[int] = None
+    path: Optional[str] = None
+    domain: Optional[str] = None
     secure: bool = False
     httponly: bool = False
 

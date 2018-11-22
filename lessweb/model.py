@@ -1,50 +1,26 @@
 import inspect
-import functools
+from abc import ABCMeta
 from enum import Enum
 from inspect import _empty
 from typing import *
 
 from lessweb.context import Context
-from lessweb.utils import _nil, _readonly, Service
+from lessweb.utils import _nil, _readonly
 from lessweb.webapi import NeedParamError, BadParamError
-from lessweb.storage import Storage
 
 
-class Jsonable:
-    def jsonize(self):
-        return str(self)
+class Model(metaclass=ABCMeta):
+    pass
 
 
-class RestParam(Jsonable):
-    def eval_from_text(self, text):
-        return
-
-    def eval_from_json(self, obj):
-        return
+class Service(metaclass=ABCMeta):
+    pass
 
 
-class PagedList(Jsonable):
-    pageNo: int = 1
-    pageSize: int = 1
-    totalNum: int = 0
-    list: List = None
-
-    @property
-    def totalPage(self):
-        d, m = divmod(self.totalNum, self.pageSize)
-        return max(1, d) if m == 0 else d + 1
-
-    def __init__(self):
-        self.list = []
-
-    def jsonize(self):
-        return {
-            'list': self.list, 'pageNo': self.pageNo, 'pageSize': self.pageSize,
-            'totalNum': self.totalNum, 'totalPage': self.totalPage
-        }
+Jsonizable = Union[str, int, bool, Dict, List, None]
 
 
-def get_func_parameters(func):
+def deprecated_func_parameters(func):
     """
     >>> def f(a:int, b=4)->int:
     ...   return a+b
@@ -61,13 +37,13 @@ def get_func_parameters(func):
     ]
 
 
-def get_annotations(x):
+def deprecated_get_annotations(x):
     return getattr(x, '__annotations__', {})
 
 
-def get_model_parameters(cls):
+def deprecated_get_model_parameters(cls):
     """get_model_parameters(Class) -> [(realname, Type, default), ...]"""
-    annos = get_annotations(cls)
+    annos = deprecated_get_annotations(cls)
     inst = cls()
     defaults = {
         k: getattr(inst, k, _nil) for k in cls.__dict__
@@ -84,42 +60,7 @@ def get_model_parameters(cls):
     ]
 
 
-class Model:
-    def storage(self):
-        return Storage({
-            k: getattr(self, k) for k, _, _
-            in get_model_parameters(type(self))
-            if hasattr(self, k)
-        })
-
-    def setall(self, *mapping, **kwargs):
-        if mapping:
-            self.setall(**mapping[0])
-        for k, v in kwargs.items():
-            if k[0] != '_':
-                try:
-                    setattr(self, k, v)
-                except AttributeError:  # property without setter
-                    pass
-
-    def copy(self, *mapping, **kwargs):
-        ret = self.__class__()
-        ret.setall(**self.storage())
-        if mapping:
-            ret.setall(**mapping[0])
-        ret.setall(**kwargs)
-        return ret
-
-    def __eq__(self, other):
-        return self is other or (type(self) == type(other) and self.storage() == other.storage())
-
-    def __repr__(self):
-        if type(self) is Model:
-            return super().__repr__()
-        return '<Model ' + repr(dict(self.storage())) + '>'
-
-
-def input_by_choose(ctx: Context, fn, realname, realtype, default):
+def deprecated_input_by_choose(ctx: Context, fn, realname, realtype, default):
     """
 
         >>> def foo(a, b, c=0, d=1, e=2):
@@ -179,7 +120,7 @@ def input_by_choose(ctx: Context, fn, realname, realtype, default):
         return value
 
 
-def fetch_model_param(ctx: Context, cls, fn):
+def deprecated_fetch_model_param(ctx: Context, cls, fn):
     """
 
         >>> class Person(Model):
@@ -206,7 +147,7 @@ def fetch_model_param(ctx: Context, cls, fn):
     return model
 
 
-def fetch_param(ctx: Context, fn):
+def deprecated_fetch_param(ctx: Context, fn):
     """
         >>> def get_person(ctx:Context, name:str, age:int, weight:int, createAt:int=2):
         ...     pass
