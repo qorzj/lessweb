@@ -23,31 +23,6 @@ http_methods = (
     'GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH',
 )
 
-status_table = {
-    200: 'OK',
-    201: 'Created',
-    202: 'Accepted',
-    204: 'No Content',
-    301: 'Moved Permanently',
-    302: 'Found',
-    303: 'See Other',
-    304: 'Not Modified',
-    307: 'Temporary Redirect',
-    400: 'Bad Request',
-    401: 'Unauthorized',
-    403: 'Forbidden',
-    404: 'Not Found',
-    405: 'Method Not Allowed',
-    406: 'Not Acceptable',
-    409: 'Conflict',
-    410: 'Gone',
-    412: 'Precondition Failed',
-    415: 'Unsupported Media Type',
-    422: 'Unprocessable Entity',
-    451: 'Unavailable For Legal Reasons',
-    500: 'Internal Server Error',
-}
-
 
 class UploadedFile:
     filename: str
@@ -73,6 +48,25 @@ class HttpStatus(Enum):
     OK = Status(code=200, reason='OK')
     Created = Status(code=201, reason='Created')
     Accepted = Status(code=202, reason='Accepted')
+    NoContent = Status(code=204, reason='No Content')
+    MovedPermanently = Status(code=301, reason='Moved Permanently')
+    Found = Status(code=302, reason='Found')
+    SeeOther = Status(code=303, reason='See Other')
+    NotModified = Status(code=304, reason='Not Modified')
+    TemporaryRedirect = Status(code=307, reason='Temporary Redirect')
+    BadRequest = Status(code=400, reason='Bad Request')
+    Unauthorized = Status(code=401, reason='Unauthorized')
+    Forbidden = Status(code=403, reason='Forbidden')
+    NotFound = Status(code=404, reason='Not Found')
+    MethodNotAllowed = Status(code=405, reason='Method Not Allowed')
+    NotAcceptable = Status(code=406, reason='Not Acceptable')
+    Conflict = Status(code=409, reason='Conflict')
+    Gone = Status(code=410, reason='Gone')
+    PreconditionFailed = Status(code=412, reason='Precondition Failed')
+    UnsupportedMediaType = Status(code=415, reason='Unsupported Media Type')
+    UnprocessableEntity = Status(code=422, reason='Unprocessable Entity')
+    UnavailableForLegalReasons = Status(code=451, reason='Unavailable For Legal Reasons')
+    InternalServerError = Status(code=500, reason='Internal Server Error')
 
 
 # HTTPError and subclasses
