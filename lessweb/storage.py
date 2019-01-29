@@ -1,3 +1,5 @@
+from typing import get_type_hints
+
 
 class Storage(dict):
     """
@@ -18,7 +20,6 @@ class Storage(dict):
             ...
         AttributeError: 'a'
     """
-
     def __getattr__(self, key):
         try:
             return self[key]
@@ -46,3 +47,9 @@ class Storage(dict):
                 self.__sub__(key)
         return self
 
+    @staticmethod
+    def of(object):
+        result = Storage()
+        for name in get_type_hints(object).keys():
+            result[name] = getattr(object, name)
+        return result

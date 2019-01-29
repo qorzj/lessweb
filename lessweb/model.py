@@ -1,12 +1,10 @@
-import inspect
+from typing import Callable, Optional, Type, get_type_hints
 from abc import ABCMeta
-from enum import Enum
-from inspect import _empty
-from typing import *
 
-from lessweb.context import Context
-from lessweb.utils import _nil, _readonly
-from lessweb.webapi import NeedParamError, BadParamError
+from lessweb.context import Context, Request, Response
+from lessweb.webapi import NeedParamError, BadParamError, UploadedFile
+from lessweb.typehint import generic_origin
+from lessweb.garage import BaseBridge
 
 
 class Model(metaclass=ABCMeta):
@@ -17,164 +15,85 @@ class Service(metaclass=ABCMeta):
     pass
 
 
-Jsonizable = Union[str, int, bool, Dict, List, None]
-
-
-def deprecated_func_parameters(func):
+def fetch_model(ctx: Context, model_type: Type[Model]):
     """
-    >>> def f(a:int, b=4)->int:
-    ...   return a+b
-    >>> ret = get_func_parameters(f)
-    >>> assert ret == [('a', int, _nil), ('b', _nil, 4)]
-    """
-    return [
-        (
-            p,
-            _nil if q.annotation is _empty else q.annotation ,
-            _nil if q.default is _empty else q.default,
-        )
-        for p, q in inspect.signature(func).parameters.items()
-    ]
-
-
-def deprecated_get_annotations(x):
-    return getattr(x, '__annotations__', {})
-
-
-def deprecated_get_model_parameters(cls):
-    """get_model_parameters(Class) -> [(realname, Type, default), ...]"""
-    annos = deprecated_get_annotations(cls)
-    inst = cls()
-    defaults = {
-        k: getattr(inst, k, _nil) for k in cls.__dict__
-    }
-    for k in cls.__dict__:  # handle read-only property
-        if isinstance(getattr(cls, k), property) and not getattr(cls, k).fset:
-            defaults[k] = _readonly
-
-    return [
-        (k, annos.get(k, _nil), defaults.get(k, _nil))  # (realname, Type, default)
-        for k in
-        (lambda x, y: x.update(y) or x)(annos.copy(), defaults)
-        if k[0] != '_'
-    ]
-
-
-def deprecated_input_by_choose(ctx: Context, fn, realname, realtype, default):
-    """
-
-        >>> def foo(a, b, c=0, d=1, e=2):
-        ...     pass
-        >>> ctx = Context()
-        >>> ctx._fields = dict(a='A', b='B', c='C', d='D', e='E', f='F')
-        >>> ctx.querynames = 'a,b,c'
-        >>> [input_by_choose(ctx, foo, k, realtype=str, default=None) for k in 'abcde']
-        ['A', 'B', 'C', None, None]
-    """
-    queryname = ctx.aliases.get(realname, realname)
-
-    if realname in ctx._pipe:
-        value = ctx.get_param(realname)
-    else:
-        pre_value = ctx.get_input(queryname, default=_nil)
-        try:
-            if pre_value != _nil:
-                if not isinstance(realtype, type):
-                    value = realtype(pre_value)
-                elif not issubclass(realtype, RestParam):
-                    if realtype is int:
-                        value = max(int(pre_value), 0)
-                    elif issubclass(realtype, Enum):
-                        def _eval_enum(x, T):
-                            for e in T.__members__.values():
-                                if str(e.value) == str(x):
-                                    return e
-                            raise ValueError("%r is not a valid %s" % (x, T.__name__))
-
-                        value = _eval_enum(pre_value, realtype)
-                    else:
-                        value = realtype(pre_value)
-                else:  # realtype is subclass of RestParam
-                    value = realtype()
-                    if ctx.is_json_request():
-                        if hasattr(value, 'lessweb_eval_from_json'):
-                            value.lessweb_eval_from_json(pre_value)
-                        else:
-                            value.eval_from_json(pre_value)
-                    else:  # ctx is not json request
-                        if hasattr(value, 'lessweb_eval_from_text'):
-                            value.lessweb_eval_from_text(pre_value)
-                        else:
-                            value.eval_from_text(pre_value)
-
-            else:  # pre_value == _nil
-                value = _nil
-        except (ValueError, TypeError) as e:
-            raise BadParamError(query=queryname, error=str(e))
-
-    if value == _nil:
-        if default == _nil:
-            raise NeedParamError(query=queryname, doc=queryname)
-        return default
-    else:
-        return value
-
-
-def deprecated_fetch_model_param(ctx: Context, cls, fn):
-    """
-
+        >>> from lessweb.storage import Storage
         >>> class Person(Model):
         ...     name: str
         ...     age: int
         ...     weight: int
-        >>> def get_person(ctx, person: Person): pass
         >>> ctx = Context()
         >>> ctx.set_alias('weight', 'w')
         >>> ctx._fields = dict(name='Bob', age='33', w='100', x='1')
-        >>> model = fetch_model_param(ctx, Person, get_person)
-        >>> assert model.storage() == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
+        >>> model = fetch_model(ctx, Person)
+        >>> assert Storage.of(model) == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
     """
-    result = {}
-    for realname, realtype, default in get_model_parameters(cls):
-        if default == _readonly:
-            continue
-        if realtype == _nil:
-            realtype = str
-        value = input_by_choose(ctx, fn, realname, realtype, default)
-        result[realname] = value
-    model = cls()
-    model.setall(**result)
-    return model
+    object = model_type()
+    bridge = BaseBridge(ctx.app.bridges)
+    fields = ctx.get_inputs()
+    for realname, realtype in get_type_hints(model_type).items():
+        if realname[0] == '_': continue  # 私有成员不赋值
+        queryname = ctx._aliases.get(realname, realname)
+        if queryname not in fields:  # 缺输入
+            if generic_origin(realtype) == Optional:
+                setattr(object, realname, None)
+            else:
+                pass  # 不赋值&不报错
+        elif realtype == UploadedFile:
+            queryvalue = fields[queryname]
+            if not isinstance(queryvalue, UploadedFile):
+                raise BadParamError(query=realname, error='Uploaded File Only')
+            setattr(object, realname, queryvalue)
+        else:  # 输入的类型转换
+            try:
+                queryvalue = fields[queryname]
+                realvalue = bridge.cast(queryvalue, type(queryvalue), realtype)
+                setattr(object, realname, realvalue)
+            except (ValueError, TypeError) as e:
+                raise BadParamError(query=realname, error=str(e))
 
 
-def deprecated_fetch_param(ctx: Context, fn):
+def fetch_param(ctx: Context, fn: Callable):
     """
         >>> def get_person(ctx:Context, name:str, age:int, weight:int, createAt:int=2):
         ...     pass
         >>> ctx = Context()
-        >>> ctx.querynames = 'name,age,weight'
         >>> ctx.set_alias('weight', 'w')
         >>> ctx._fields = dict(name='Bob', age='33', w='100', weight='1', createAt='9')
         >>> param = fetch_param(ctx, get_person)
         >>> assert param == {'ctx': ctx, 'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
     """
     result = {}
-    for realname, realtype, default in get_func_parameters(fn):
-        if isinstance(realtype, type):
-            if issubclass(realtype, Context):
-                result[realname] = ctx
-                continue
-
-            if issubclass(realtype, Service):
-                result[realname] = realtype(ctx)
-                continue
-
-            if issubclass(realtype, Model):
-                result[realname] = fetch_model_param(ctx, realtype, fn)
-                continue
-
-        if realtype == _nil: realtype = str
-        value = input_by_choose(ctx, fn, realname, realtype, default)
-        result[realname] = value
-
+    bridge = BaseBridge(ctx.app.bridges)
+    fields = ctx.get_inputs()
+    for realname, realtype in get_type_hints(fn).items():
+        if realname == 'return': continue
+        if realtype == Context:
+            result[realname] = ctx
+        elif realtype == Request:
+            result[realname] = ctx.request
+        elif realtype == Response:
+            result[realname] = ctx.response
+        elif issubclass(realtype, Service):
+            result[realname] = realtype(ctx)
+        elif issubclass(realtype, Model):
+            result[realname] = fetch_model(ctx, realtype)
+        else:
+            queryname = ctx._aliases.get(realname, realname)
+            if queryname not in fields:  # 缺输入
+                if generic_origin(realtype) == Optional:
+                    result[realname] = None
+                else:
+                    raise NeedParamError(query=realname, doc=realname)
+            elif realtype == UploadedFile:
+                queryvalue = fields[queryname]
+                if not isinstance(queryvalue, UploadedFile):
+                    raise BadParamError(query=realname, error='Uploaded File Only')
+                result[realname] = queryvalue
+            else:  # 输入的类型转换
+                try:
+                    queryvalue = fields[queryname]
+                    result[realname] = bridge.cast(queryvalue, type(queryvalue), realtype)
+                except (ValueError, TypeError) as e:
+                    raise BadParamError(query=realname, error=str(e))
     return result

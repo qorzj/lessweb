@@ -1,3 +1,4 @@
+from typing import Optional, Dict
 from http.cookies import Morsel, SimpleCookie, CookieError
 from urllib.parse import unquote, quote
 from enum import Enum
@@ -69,155 +70,37 @@ class HttpStatus(Enum):
     InternalServerError = Status(code=500, reason='Internal Server Error')
 
 
-# HTTPError and subclasses
-class HttpError(Exception):
-    def __init__(self, *, status_code, text, headers=None):
-        self.status_code: int = status_code
-        self.text: str = text
-        self.headers = headers or []
+class Cookie:
+    name: str
+    value: str
+    expires: Optional[int]
+    path: str
+    domain: Optional[str]
+    secure: bool
+    httponly: bool
 
-    @property
-    def reason(self):
-        return status_table.get(self.status_code, 'Other Error')
+    def __init__(self, name:str, value:str, expires:int=None, path:str='', domain:str=None, secure:bool=False, httponly:bool=False):
+        self.name = name
+        self.value = value
+        self.expires = expires
+        self.path = path
+        self.domain = domain
+        self.secure = secure
+        self.httponly = httponly
 
-
-class _Redirect(HttpError):
-    def __init__(self, status_code, fullurl, headers):
-        headers = headers or []
-        set_header(headers, 'Content-Type', 'text/html', setdefault=True)
-        set_header(headers, 'Location', fullurl, setdefault=True)
-        super().__init__(status_code=status_code, text='', headers=headers)
-
-
-class MovedPermanently(_Redirect):
-    def __init__(self, url, headers=None):
-        headers = headers or []
-        super().__init__(status_code=301, fullurl=url, headers=headers)
-
-
-class Found(_Redirect):
-    def __init__(self, url, headers=None):
-        headers = headers or []
-        super().__init__(status_code=302, fullurl=url, headers=headers)
+    def dumps(self):
+        morsel = Morsel()
+        morsel.set(self.name, self.value, quote(self.value))
+        morsel['expires'] = '' if self.expires is None else self.expires
+        morsel['path'] = self.path
+        if self.domain: morsel['domain'] = self.domain
+        if self.secure: morsel['secure'] = self.secure
+        ret = morsel.OutputString()
+        if self.httponly: ret += '; httponly'
+        return ret
 
 
-class SeeOther(_Redirect):
-    def __init__(self, url, headers=None):
-        headers = headers or []
-        super().__init__(status_code=303, fullurl=url, headers=headers)
-
-
-class NotModified(HttpError):
-    def __init__(self):
-        super().__init__(status_code=304, text='')
-
-
-class TempRedirect(_Redirect):
-    def __init__(self, url, headers=None):
-        super().__init__(status_code=307, fullurl=url, headers=headers)
-
-
-class _TextHttpError(HttpError):
-    def __init__(self, status_code, text, headers):
-        headers = headers or []
-        set_header(headers, 'Content-Type', 'text/html', setdefault=True)
-        super().__init__(status_code=status_code, text=text, headers=headers)
-
-
-class BadRequest(_TextHttpError):
-    def __init__(self, text, headers=None):
-        super().__init__(status_code=400, text=text, headers=headers)
-
-
-class Unauthorized(_TextHttpError):
-    def __init__(self, text='unauthorized', headers=None):
-        super().__init__(status_code=401, text=text, headers=headers)
-
-
-class Forbidden(_TextHttpError):
-    def __init__(self, text="forbidden", headers=None):
-        super().__init__(status_code=403, text=text, headers=headers)
-
-
-class NotFound(HttpError):
-    def __init__(self, text, headers=None):
-        headers = headers or []
-        set_header(headers, 'Content-Type', 'text/html', setdefault=True)
-        super().__init__(status_code=404, text=text, headers=headers)
-
-
-class NoMethod(_TextHttpError):
-    def __init__(self, text='', methods=None and ['GET', ...], headers=None):
-        headers = headers or []
-        if methods:
-            set_header(headers, 'Allow', ', '.join(methods), setdefault=True)
-        super().__init__(status_code=405, text=text, headers=headers)
-
-
-class NotAcceptable(_TextHttpError):
-    def __init__(self, text='not acceptable', headers=None):
-        super().__init__(status_code=406, text=text, headers=headers)
-
-
-class Conflict(_TextHttpError):
-    def __init__(self, text='conflict', headers=None):
-        super().__init__(status_code=409, text=text, headers=headers)
-
-
-class Gone(_TextHttpError):
-    def __init__(self, text='gone', headers=None):
-        super().__init__(status_code=410, text=text, headers=headers)
-
-
-class PreconditionFailed(_TextHttpError):
-    def __init__(self, text='precondition failed', headers=None):
-        super().__init__(status_code=412, text=text, headers=headers)
-
-
-class UnsupportedMediaType(_TextHttpError):
-    def __init__(self, text='unsupported media type', headers=None):
-        super().__init__(status_code=415, text=text, headers=headers)
-
-
-class UnavailableForLegalReasons(_TextHttpError):
-    def __init__(self, text='unavailable for legal reasons', headers=None):
-        super().__init__(status_code=451, text=text, headers=headers)
-
-
-class InternalError(_TextHttpError):
-    def __init__(self, text='internal server error', headers=None):
-        super().__init__(status_code=500, text=text, headers=headers)
-
-
-def set_header(headers, key, value, multiple=False, setdefault=False):
-    assert isinstance(key, str) and isinstance(value, str)
-    if '\n' in key or '\r' in key or '\n' in value or '\r' in value:
-        raise ValueError('invalid characters in header')
-    if not multiple:
-        for idx, (k, v) in enumerate(headers):
-            if k.lower() == key.lower():
-                if not setdefault:
-                    headers[idx] = (key, value)
-                return
-    headers.append((key, value))
-
-
-def make_cookie(name, value, expires='', path='', domain=None, secure=False, httponly=False):
-    """Make a cookie string"""
-    morsel = Morsel()
-    morsel.set(name, value, quote(value))
-    if isinstance(expires, int) and expires < 0:
-        expires = -1000000000
-    morsel['expires'] = expires
-    morsel['path'] = path
-    if domain: morsel['domain'] = domain
-    if secure: morsel['secure'] = secure
-    value = morsel.OutputString()
-    if httponly: value += '; httponly'
-    return value
-
-
-def parse_cookie(http_cookie):
+def parse_cookie(http_cookie)->Dict[str, str]:
     """Parse from cookie header string to Dict"""
     cookie = SimpleCookie()
     try:
@@ -256,3 +139,28 @@ class BadParamError(Exception):
 
     def __str__(self):
         return 'query:%s error:%s' % (self.query, self.error)
+
+
+def header_name_of_wsgi_key(wsgi_key):
+    """
+    >>> header_name_of_wsgi_key('HTTP_ACCEPT_LANGUAGE')
+    'Accept-Language'
+    >>> header_name_of_wsgi_key('HTTP_AUTHORIZATION')
+    'Authorization'
+
+    """
+    if wsgi_key.startswith('HTTP_'):
+        return '-'.join(s.capitalize() for s in wsgi_key[5:].split('_'))
+    else:
+        return ''
+
+
+def wsgi_key_of_header_name(header_name):
+    """
+    >>> wsgi_key_of_header_name('Accept-Language')
+    'HTTP_ACCEPT_LANGUAGE'
+    >>> wsgi_key_of_header_name('Authorization')
+    'HTTP_AUTHORIZATION'
+
+    """
+    return 'HTTP_' + header_name.replace('-', '_').upper()

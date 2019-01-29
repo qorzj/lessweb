@@ -10,22 +10,23 @@ import os
 import re
 import traceback
 from types import GeneratorType
-from typing import NamedTuple, Any, Callable, Tuple, Dict
-from enum import Enum
+from typing import List, Any, Callable, Type
 from urllib.parse import splitquery, urlencode
 from io import BytesIO
 from contextlib import contextmanager
 
-from lessweb.webapi import HttpError, NotFound, NoMethod, NeedParamError, BadParamError
+from lessweb.webapi import NeedParamError, BadParamError, HttpStatus
 from lessweb.webapi import http_methods
 from lessweb.context import Context
-from lessweb.model import fetch_param, Model, Jsonable
+from lessweb.model import fetch_param
 from lessweb.storage import Storage
-from lessweb.utils import eafp, json_dumps, re_standardize
+from lessweb.utils import eafp, re_standardize
+from lessweb.bridge import Bridge
+from lessweb.garage import Jsonizable, BaseBridge, JsonToJson, ModelToDict
 
 
 __all__ = [
-    "global_data", "Interceptor", "Mapping", "interceptor", "Application",
+    "Interceptor", "Mapping", "interceptor", "Application",
 ]
 
 
@@ -99,27 +100,6 @@ def interceptor(dealer):
     return _1_wrapper
 
 
-def _make_default_json_encoders(jsonizers):
-    def _jsonable_encoder(obj:Jsonable):
-        if hasattr(obj, 'lessweb_jsonize'):
-            return obj.lessweb_jsonize()
-        return obj.jsonize()
-
-    def _datetime_encoder(obj:datetime):
-        return obj.strftime('%Y-%m-%d %H:%M:%S')
-
-    def _model_encoder(obj:Model):
-        return obj.storage()
-
-    def _enum_encoder(obj:Enum):
-        if hasattr(obj, 'show'):
-            return dict(value=obj.value, show=obj.show)
-        else:
-            return obj.value
-
-    return [*jsonizers, _jsonable_encoder, _datetime_encoder, _model_encoder, _enum_encoder]
-
-
 class Application(object):
     """
     Application to delegate requests based on path.
@@ -133,9 +113,9 @@ class Application(object):
 
     """
     def __init__(self, encoding='utf-8', debug=True) -> None:
-        self.mapping = []
-        self.interceptors = []
-        self.jsonizers = []
+        self.mapping: List[Mapping] = []
+        self.interceptors: List[Interceptor] = []
+        self.bridges: List[Bridge] = [JsonToJson, ModelToDict]
         self.encoding: str = encoding
         self.debug: bool = debug
 
@@ -189,9 +169,10 @@ class Application(object):
                         supported_methods.append(mapping.method)
 
             if not supported_methods:
-                raise NotFound(text="Not Found")
+                ctx.response.set_status(HttpStatus.NotFound)
             else:
-                raise NoMethod(text="Method Not Allowed", methods=supported_methods)
+                ctx.response.send_allow_methods(supported_methods)
+                ctx.response.set_status(HttpStatus.MethodNotAllowed)
 
         try:
             f = build_controller(_1_mapping_match())
@@ -199,15 +180,9 @@ class Application(object):
                 if itr.patternobj.search(ctx.path) and (itr.method == ctx.method or itr.method == '*'):
                     f = interceptor(itr.dealer)(f)
             return f(ctx)
-        except HttpError as e:
-            ctx.status_code = e.status_code
-            ctx.reason = e.reason
-            ctx.headers = e.headers
-            return e.text
         except (NeedParamError, BadParamError) as e:
-            ctx.status_code = 400
-            ctx.reason = 'Bad Request'
-            ctx.headers = [('Content-Type', 'text/html; charset=' + self.encoding)]
+            ctx.response.send_text_html(self.encoding)
+            ctx.response.set_status(HttpStatus.BadRequest)
             return repr(e)
 
     def add_interceptor(self, pattern, method, dealer):
@@ -225,6 +200,9 @@ class Application(object):
         assert method == '*' or method in http_methods, 'Method:[{}] should be one of {}'.format(method, ['*'] + http_methods)
         patternobj = re.compile(re_standardize(pattern))
         self.interceptors.insert(0, Interceptor(pattern, method, dealer, patternobj))
+
+    def add_bridge(self, bridge: Type[Bridge]):
+        self.bridges.append(bridge)
 
     def add_mapping(self, pattern, method, dealer, doc='', view=None, querynames='*'):
         """
@@ -295,9 +273,6 @@ class Application(object):
     def add_put_mapping(self, pattern, dealer, doc='', view=None, querynames='*'):
         return self.add_mapping(pattern, 'PUT', dealer, doc, view, querynames)
 
-    def add_jsonizer(self, jsonizer):
-        self.jsonizers.append(jsonizer)
-
     def wsgifunc(self, *middleware):
         """
             Example:
@@ -324,11 +299,12 @@ class Application(object):
 
             ctx = self._load(env)
             try:
-                _ = self._handle_with_dealers(ctx)
-                result = _1_peep(_) if isinstance(_, GeneratorType) else (_,)
+                resp = self._handle_with_dealers(ctx)
+                result = _1_peep(resp) if isinstance(resp, GeneratorType) else (resp,)
             except Exception as e:
                 logging.exception(e)
-                ctx.status_code, ctx.reason = 500, 'Internal Server Error'
+                ctx.response.send_text_html(self.encoding)
+                ctx.response.set_status(HttpStatus.InternalServerError)
                 result = (traceback.format_exc(),)
 
             def _2_build_result(result):
@@ -340,13 +316,17 @@ class Application(object):
                     elif r is None:
                         yield b''
                     else:
-                        yield json_dumps(r, _make_default_json_encoders(self.jsonizers)).encode(self.encoding)
+                        yield json.dumps(BaseBridge(self.bridges).cast(r, type(r), Jsonizable)).encode(self.encoding)
 
             result = _2_build_result(result)
-            status = '{0} {1}'.format(ctx.status_code, ctx.reason)
-            ctx.set_header('Content-Type', 'text/html; charset=' + self.encoding, setdefault=True)
-            headers = list(ctx.headers)
-            start_resp(status, headers)
+            status = ctx.response.get_status().value
+            status_text = '{0} {1}'.format(status.code, status.reason)
+            if not ctx.response.contains_header('Content-Type'):
+                ctx.response.send_text_html(self.encoding)
+            headers = list(ctx.response._headers)
+            for cookie in ctx.response._cookies:
+                headers.append(('Set-Cookie', cookie.dumps()))
+            start_resp(status_text, headers)
             return itertools.chain(result, (b'',))
 
         for m in middleware:

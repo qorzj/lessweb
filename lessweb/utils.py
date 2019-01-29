@@ -32,30 +32,6 @@ class Nil:
 
 
 _nil = Nil(0)
-_readonly = Nil(1)
-
-
-T = TypeVar('T')
-class Service(Generic[T]):
-    ctx: T
-    def __init__(self, ctx: T = None):
-        self.ctx = ctx
-
-
-def json_dumps(obj, encoders=()):
-
-    class _1_Encoder(json.JSONEncoder):
-        def default(self, obj):
-            for f in encoders:
-                t = get_type_hints(f)
-                if 'return' in t: t.pop('return')
-                assert len(t) == 1, repr(f) + ' in encoders expected 1 arguments with type hint'
-                varclass = t.popitem()[1]
-                if isinstance(obj, varclass):
-                    return f(obj)
-            return json.JSONEncoder.default(self, obj)
-
-    return json.dumps(obj, cls=_1_Encoder)
 
 
 def re_standardize(pattern):

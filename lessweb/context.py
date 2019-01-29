@@ -1,19 +1,15 @@
-from typing import NamedTuple, Any, Callable, Optional, overload, Dict, List
+from typing import Optional, Dict, List, Union
 import cgi
 import json
-import os
-import gzip
-import requests
-from wsgiref.handlers import format_date_time
-from datetime import datetime, timedelta
-from time import mktime
 
 from io import BytesIO
 
 from lessweb.storage import Storage
-from lessweb.webapi import UploadedFile, HttpError, mimetypes, hop_by_hop_headers
-from lessweb.webapi import make_cookie, parse_cookie, set_header
-from lessweb.utils import _nil, fields_in_query
+from lessweb.webapi import UploadedFile, Cookie, HttpStatus
+from lessweb.webapi import header_name_of_wsgi_key, wsgi_key_of_header_name
+from lessweb.webapi import parse_cookie
+from lessweb.utils import fields_in_query
+from lessweb.garage import Jsonizable
 
 
 def _process_fieldstorage(fs):
@@ -30,6 +26,90 @@ def _dictify(fs):
     if fs.list is None:
         fs.list = []
     return dict([(k, _process_fieldstorage(fs[k])) for k in fs.keys()])
+
+
+class Request:
+    def __init__(self, env: Dict):
+        self.env = env
+        self._cookies: Dict[str, str] = {}
+
+    def _init_cookies(self):
+        if not self._cookies and self.contains_header('cookie'):
+            self._cookies = parse_cookie(self.get_header('cookie'))
+
+    def contains_cookie(self, name: str) -> bool:
+        self._init_cookies()
+        return name in self._cookies
+
+    def get_cookie(self, name: str) -> str:
+        self._init_cookies()
+        return self._cookies[name]
+
+    def get_cookienames(self) -> List[str]:
+        self._init_cookies()
+        return list(self._cookies.keys())
+
+    def contains_header(self, name: str) -> bool:
+        return wsgi_key_of_header_name(name) in self.env
+
+    def get_header(self, name: str) -> str:
+        """
+        根据http规范，多header应该合并入一个key/value，例如requests的headers就是dict。
+        """
+        return self.env[wsgi_key_of_header_name(name)]
+
+    def get_headernames(self) -> List[str]:
+        return [s for s in (header_name_of_wsgi_key(k) for k in self.env.keys()) if s]
+
+
+class Response:
+    def __init__(self):
+        self._cookies: List[Cookie] = []
+        self._status: HttpStatus = None
+        self._headers: Dict[str, str] = {}
+
+    def add_cookie(self, cookie: Cookie) -> None:
+        self._cookies.append(cookie)
+
+    def set_status(self, status: HttpStatus) -> None:
+        self._status = status
+
+    def get_status(self) -> HttpStatus:
+        return self._status
+
+    def set_header(self, name: str, value: Union[str, int]) -> None:
+        if '\n' in name or '\r' in name or '\n' in value or '\r' in value:
+            raise ValueError('invalid characters in header')
+        self._headers[name] = str(value)
+
+    def contains_header(self, name: str) -> bool:
+        return name in self._headers
+
+    def get_header(self, name: str) -> str:
+        return self._headers[name]
+
+    def get_headernames(self) -> List[str]:
+        return list(self._headers.keys())
+
+    def clear_headers(self) -> None:
+        self._headers.clear()
+
+    def send_access_allow(self, allow_headers: List[str]=None) -> None:
+        allow_headers = allow_headers or []
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS')
+        self.set_header('Access-Control-Allow-Origin', '*')
+        self.set_header('Access-Control-Allow-Headers',
+                        'Cache-Control, Accept-Encoding, Origin, X-Requested-With, Content-Type, Accept, '
+                        'Authorization, Referer, User-Agent' + ''.join(', '+h for h in allow_headers))
+
+    def send_allow_methods(self, methods: List[str]):
+        self.set_header('Allow', ', '.join(methods))
+
+    def send_redirect(self, location: str) -> None:
+        self.set_header('Location', location)
+
+    def send_text_html(self, encoding: str):
+        self.set_header('Content-Type', 'text/html; charset=' + encoding)
 
 
 class Context(object):
@@ -62,19 +142,15 @@ class Context(object):
         lessweb use ctx.path in routing.
     """
     def __init__(self, app=None) -> None:
-        self.status_code: int = 200
-        self.reason: str = 'OK'
-        self.headers: List = []
         self.app_stack: List = []
         self.app = app
         self.view = None
-        self.querynames = None  # querynames in whitelist
-        self.aliases: Dict[str, str] = {}  # alias {realname: queryname}
+        self._aliases: Dict[str, str] = {}  # alias {realname: queryname}
 
-        self.url_input: Dict = {}
-        self.json_input: Optional[Dict] = None
-        self._post_data: Optional[Dict] = None
-        self._fields: Optional[Dict] = None
+        self._url_input: Dict = {}  # Input from URL
+        self._json_input: Optional[Dict] = None  # Input from Json Body
+        self._post_data: Optional[Dict] = None  # Raw Body Input
+        self._fields: Optional[Dict] = None  # Input from Json Body and Form Fields
         self._pipe: Storage = Storage()
 
         self.environ: Dict = {}
@@ -90,58 +166,23 @@ class Context(object):
         self.path: str = ''
         self.query: str = ''
         self.fullpath: str = ''
-
-    def __call__(self):
-        return self.app_stack[-1](self)
-
-    def set_param(self, realname, realvalue):
-        self._pipe[realname] = realvalue
-
-    def get_param(self, realname, default=None):
-        return self._pipe.get(realname, default)
-
-    def set_header(self, header, value, multiple=False, setdefault=False):
-        set_header(self.headers, header, value, multiple=multiple, setdefault=setdefault)
-
-    def set_json_header(self):
-        self.set_header('Content-Type', 'application/json; charset=' + self.app.encoding, setdefault=True)
-
-    def set_access_allow_header(self, headers=('token',)):
-        self.set_header('Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS')
-        self.set_header('Access-Control-Allow-Origin', '*')
-        self.set_header('Access-Control-Allow-Headers',
-                       'Cache-Control, Accept-Encoding, %s, uid, Origin, X-Requested-With, Content-Type, Accept, '
-                       'Authorization, Referer, User-Agent' % (', '.join(headers)))
-
-    def get_header(self, header, default=None):
-        """
-        Example:
-
-        """
-        key = 'HTTP_' + header.replace('-', '_').upper()
-        return self.env.get(key, default)
-
-    def set_alias(self, realname, queryname):
-        self.aliases[realname] = queryname
-
-    def is_json_request(self):
-        return self.json_input is not None or \
-               'json' in self.env.get('CONTENT_TYPE', '').lower()
+        self.request: Request = Request(self.env)
+        self.response: Response = Response()
 
     @property
-    def field_input(self):
-        if self.json_input is not None:
-            return self.json_input
+    def _field_input(self)->Dict:  # Input from Form
+        if self._json_input is not None:
+            return self._json_input
         if self._fields is not None:
             return self._fields
-        if self.is_json_request() and self.data():
+        if self.is_json_request() and self.body_data():
             try:
-                self.json_input = json.loads(self.data().decode(self.app.encoding))
+                self._json_input = json.loads(self.body_data().decode(self.app.encoding))
             except:
-                self.json_input = {'__error__': 'invalid json received'}
-            if not isinstance(self.json_input, dict):
-                self.json_input = {'__error__': 'invalid json received (not dict)'}
-            return self.json_input
+                self._json_input = {'__error__': 'invalid json received'}
+            if not isinstance(self._json_input, dict):
+                self._json_input = {'__error__': 'invalid json received (not dict)'}
+            return self._json_input
         else:
             try:
                 if self.method in ['HEAD', 'DELETE']:
@@ -152,18 +193,30 @@ class Context(object):
                 if self.method == 'GET':
                     _ = cgi.FieldStorage(environ=self.env.copy(), keep_blank_values=1)
                 else:
-                    fp = BytesIO(self.data())
+                    fp = BytesIO(self.body_data())
                     _ = cgi.FieldStorage(fp=fp, environ=self.env.copy(), keep_blank_values=1)
                 self._fields = _dictify(_)
             except:
                 self._fields = {'__error__': 'invalid fields received'}
         return self._fields
 
-    def data(self) -> bytes:
-        """
-        Example:
+    def __call__(self):
+        return self.app_stack[-1](self)
 
-        """
+    def set_param(self, realname, realvalue):
+        self._pipe[realname] = realvalue
+
+    def get_param(self, realname, default=None):
+        return self._pipe.get(realname, default)
+
+    def set_alias(self, realname, queryname):
+        self._aliases[realname] = queryname
+
+    def is_json_request(self):
+        return self._json_input is not None or \
+               'json' in self.env.get('CONTENT_TYPE', '').lower()
+
+    def body_data(self) -> bytes:
         if self._post_data is not None:
             return self._post_data
         try:
@@ -173,29 +226,9 @@ class Context(object):
         self._post_data = self.env['wsgi.input'].read(cl)
         return self._post_data
 
-    def get_input(self, queryname, default=None):
-        """
-        Example:
+    def get_input(self, queryname, default=None)->Jsonizable:
+        return self._url_input[queryname] if queryname in self._url_input else \
+            self._field_input.get(queryname, default)
 
-        """
-        if self.querynames is not None and queryname not in self.querynames:
-            return _nil
-
-        ret = self.url_input.get(queryname, _nil)
-        if ret != _nil:
-            return ret
-
-        return self.field_input.get(queryname, default)
-
-    def set_cookie(self, name, value, expires='', domain=None, secure=False, httponly=False, path=None):
-        """Set a cookie."""
-        path = path or self.homepath + '/'
-        value = make_cookie(name, value, expires, path, domain, secure, httponly)
-        self.set_header('Set-Cookie', value, multiple=True)
-
-    def get_cookie(self):
-        """Get cookies --> Dict"""
-        http_cookie = self.get_header('cookie', '')
-        return parse_cookie(http_cookie)
-
-    # ~class Context
+    def get_inputs(self)->Dict[str, Jsonizable]:
+        return {**self._field_input, **self._url_input}
