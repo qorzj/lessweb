@@ -141,6 +141,17 @@ class BadParamError(Exception):
         return 'query:%s error:%s' % (self.query, self.error)
 
 
+class NotFoundError(Exception):
+    def __init__(self, methods=None):
+        self.methods = methods or []
+
+    def __repr__(self):
+        return 'Method Not Allowed' if self.methods else 'Not Found'
+
+    def __str__(self):
+        return 'Method Not Allowed' if self.methods else 'Not Found'
+
+
 def header_name_of_wsgi_key(wsgi_key):
     """
     >>> header_name_of_wsgi_key('HTTP_ACCEPT_LANGUAGE')

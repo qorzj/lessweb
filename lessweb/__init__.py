@@ -14,5 +14,5 @@ from .application import interceptor, Application
 from .context import Context, Request, Response
 from .model import Model, Service
 from .storage import Storage, ChainMock
-from .webapi import UploadedFile, NeedParamError, BadParamError, Cookie
+from .webapi import NeedParamError, BadParamError, NotFoundError, UploadedFile, Cookie, HttpStatus
 from .utils import _nil, eafp

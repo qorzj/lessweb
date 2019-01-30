@@ -1,5 +1,5 @@
 from unittest import TestCase
-from lessweb import Application
+from lessweb import Application, Response, HttpStatus
 
 
 class TestWiki(TestCase):
@@ -32,3 +32,15 @@ class TestWiki(TestCase):
         app.add_get_mapping('/book/{bookId}', dealer=book_detail)
         with app.test_get('/book/1357?author=None') as ret:
             self.assertEqual({"bookId": 1357, "author": "None"}, ret)
+
+    def test_redirect(self):
+        def f(): return 'Hello'
+        def g(resp: Response):
+            resp.send_redirect('/home/a')
+            resp.set_status(HttpStatus.SeeOther)
+            return ''
+        app = Application()
+        app.add_get_mapping('/a', dealer=f)
+        app.add_get_mapping('/b', dealer=g)
+        with app.test_get('/b', status_code=303, parsejson=False) as ret:
+            self.assertEqual(ret, '')

@@ -15,7 +15,7 @@ from urllib.parse import splitquery, urlencode
 from io import BytesIO
 from contextlib import contextmanager
 
-from lessweb.webapi import NeedParamError, BadParamError, HttpStatus
+from lessweb.webapi import NeedParamError, BadParamError, NotFoundError, HttpStatus
 from lessweb.webapi import http_methods
 from lessweb.context import Context
 from lessweb.model import fetch_param, ModelToDict
@@ -167,15 +167,12 @@ class Application(object):
                         return mapping.dealer
                     else:
                         supported_methods.append(mapping.method)
-
-            if not supported_methods:
-                ctx.response.set_status(HttpStatus.NotFound)
-            else:
-                ctx.response.send_allow_methods(supported_methods)
-                ctx.response.set_status(HttpStatus.MethodNotAllowed)
+            # end: for
+            raise NotFoundError(methods=supported_methods)
 
         try:
             f = build_controller(_1_mapping_match())
+            if f is None: return ''
             for itr in self.interceptors:
                 if itr.patternobj.search(ctx.path) and (itr.method == ctx.method or itr.method == '*'):
                     f = interceptor(itr.dealer)(f)
@@ -183,6 +180,13 @@ class Application(object):
         except (NeedParamError, BadParamError) as e:
             ctx.response.send_text_html(self.encoding)
             ctx.response.set_status(HttpStatus.BadRequest)
+            return repr(e)
+        except NotFoundError as e:
+            if e.methods:
+                ctx.response.send_allow_methods(e.methods)
+                ctx.response.set_status(HttpStatus.MethodNotAllowed)
+            else:
+                ctx.response.set_status(HttpStatus.NotFound)
             return repr(e)
 
     def add_interceptor(self, pattern, method, dealer):
