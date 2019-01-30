@@ -65,7 +65,7 @@ class Request:
 class Response:
     def __init__(self):
         self._cookies: List[Cookie] = []
-        self._status: HttpStatus = None
+        self._status: HttpStatus = HttpStatus.OK
         self._headers: Dict[str, str] = {}
 
     def add_cookie(self, cookie: Cookie) -> None:

@@ -1,12 +1,10 @@
+from typing import Any, Tuple, Dict, Type, get_type_hints
 from contextlib import contextmanager
 import json
 from pathlib import Path
 import pickle
 import re
-from typing import get_type_hints
-from typing import TypeVar, Generic
-from unittest.mock import Mock, DEFAULT
-from .storage import Storage
+import inspect
 
 
 def eafp(ask, default):
@@ -84,36 +82,6 @@ def fields_in_query(query):
     return ret
 
 
-class ChainMock:
-    """
-    Usage: https://github.com/qorzj/lessweb/wiki/%E7%94%A8mock%E6%B5%8B%E8%AF%95service
-    """
-    def __init__(self, path, return_value):
-        self.returns = {}
-        self.mock = {}
-        self.join(path, return_value)
-
-    def join(self, path, return_value):
-        if not path.startswith('.'):
-            path = '.' + path
-        self.returns[path] = return_value
-        self.mock[path] = Mock(return_value=return_value)
-        while '.' in path:
-            prefix, key = path.rsplit('.', 1)
-            if prefix not in self.returns: self.returns[prefix] = Storage()
-            self.returns[prefix][key] = self.mock[path]
-            self.mock[prefix] = Mock(return_value=self.returns[prefix])
-            path = prefix
-        return self
-
-    def __call__(self, path=None):
-        if path is None:
-            return self.mock['']()
-        if not path.startswith('.'):
-            path = '.' + path
-        return self.mock[path]
-
-
 class StaticDict(dict):
     touched = False
 
@@ -150,3 +118,15 @@ def static_dict(path):
             json.dump(data, path.open('w'))
         else:
             pickle.dump(data, path.open('wb'))
+
+
+def func_arg_spec(fn)->Dict[str, Tuple[Type, bool]]:
+    arg_spec = {}  # name: (type_, has_default)
+    inspect_ret = inspect.getfullargspec(fn)
+    annotations = get_type_hints(fn)
+    kw_len = len(inspect_ret.args) - len(inspect_ret.defaults or ())
+    for i, name in enumerate(inspect_ret.args):
+        arg_spec[name] = (annotations.get(name, Any), i >= kw_len)
+    for name in inspect_ret.kwonlyargs:
+        arg_spec[name] = (annotations.get(name, Any), True)
+    return arg_spec

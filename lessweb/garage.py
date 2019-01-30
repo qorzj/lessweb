@@ -1,8 +1,6 @@
-from typing import Any, Dict, List, Union, NamedTuple
-from typing import get_type_hints
+from typing import Any, Dict, List, Union
 
 from lessweb.bridge import Bridge
-from lessweb.model import Model
 
 
 Jsonizable = Union[str, int, float, Dict, List, None]
@@ -14,21 +12,6 @@ class BaseBridge(Bridge):
 
     def to(self)->Any:
         return ...
-
-
-class ModelToDict(Bridge):
-    value: Model
-
-    def of(self, source: Model):
-        self.value = source
-
-    def to(self) -> Jsonizable:
-        ret = {}
-        for name, type_ in get_type_hints(type(self.value)).items():
-            if hasattr(self.value, name):
-                value = self.cast(getattr(self.value, name), type_, Jsonizable)
-                ret[name] = value
-        return ret
 
 
 class JsonToJson(Bridge):

@@ -1,4 +1,5 @@
 from typing import get_type_hints
+from unittest.mock import Mock
 
 
 class Storage(dict):
@@ -53,3 +54,33 @@ class Storage(dict):
         for name in get_type_hints(object).keys():
             result[name] = getattr(object, name)
         return result
+
+
+class ChainMock:
+    """
+    Usage: https://github.com/qorzj/lessweb/wiki/%E7%94%A8mock%E6%B5%8B%E8%AF%95service
+    """
+    def __init__(self, path, return_value):
+        self.returns = {}
+        self.mock = {}
+        self.join(path, return_value)
+
+    def join(self, path, return_value):
+        if not path.startswith('.'):
+            path = '.' + path
+        self.returns[path] = return_value
+        self.mock[path] = Mock(return_value=return_value)
+        while '.' in path:
+            prefix, key = path.rsplit('.', 1)
+            if prefix not in self.returns: self.returns[prefix] = Storage()
+            self.returns[prefix][key] = self.mock[path]
+            self.mock[prefix] = Mock(return_value=self.returns[prefix])
+            path = prefix
+        return self
+
+    def __call__(self, path=None):
+        if path is None:
+            return self.mock['']()
+        if not path.startswith('.'):
+            path = '.' + path
+        return self.mock[path]

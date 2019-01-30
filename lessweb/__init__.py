@@ -13,6 +13,6 @@ from . import application, context, model, storage, webapi
 from .application import interceptor, Application
 from .context import Context, Request, Response
 from .model import Model, Service
-from .storage import Storage
+from .storage import Storage, ChainMock
 from .webapi import UploadedFile, NeedParamError, BadParamError, Cookie
-from .utils import _nil, eafp, ChainMock
+from .utils import _nil, eafp

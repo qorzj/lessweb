@@ -27,6 +27,8 @@ class Bridge(metaclass=ABCMeta):
         return source_type, dist_type
 
     def cast(self, object: Any, source_type: Type, dist: Type[T]) -> T:
+        if isinstance(object, (str, int, float)) and dist in (str, int, bool, float):
+            return dist(object)
         for bridge in self.bridges:
             bridge_src, bridge_dist = bridge.inspect()
             if issubtyping(source_type, bridge_src) and issubtyping(bridge_dist, dist):
@@ -35,4 +37,4 @@ class Bridge(metaclass=ABCMeta):
                 return b.to()
         if issubtyping(source_type, dist):
             return object
-        raise TypeError('Bridges cannot cast object of type [%s]')
+        raise TypeError('Bridges cannot cast %s to %s' % (source_type, dist))

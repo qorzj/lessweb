@@ -18,11 +18,11 @@ from contextlib import contextmanager
 from lessweb.webapi import NeedParamError, BadParamError, HttpStatus
 from lessweb.webapi import http_methods
 from lessweb.context import Context
-from lessweb.model import fetch_param
+from lessweb.model import fetch_param, ModelToDict
 from lessweb.storage import Storage
 from lessweb.utils import eafp, re_standardize
 from lessweb.bridge import Bridge
-from lessweb.garage import Jsonizable, BaseBridge, JsonToJson, ModelToDict
+from lessweb.garage import Jsonizable, BaseBridge, JsonToJson
 
 
 __all__ = [
@@ -156,7 +156,7 @@ class Application(object):
                 _ = mapping.patternobj.search(ctx.path)
                 if _:
                     if mapping.method == ctx.method or mapping.method == '*':
-                        ctx.url_input = _.groupdict()
+                        ctx._url_input.update(_.groupdict())
                         ctx.view = mapping.view
                         if mapping.querynames == '*':
                             ctx.querynames = None
@@ -323,7 +323,7 @@ class Application(object):
             status_text = '{0} {1}'.format(status.code, status.reason)
             if not ctx.response.contains_header('Content-Type'):
                 ctx.response.send_text_html(self.encoding)
-            headers = list(ctx.response._headers)
+            headers = list(ctx.response._headers.items())
             for cookie in ctx.response._cookies:
                 headers.append(('Set-Cookie', cookie.dumps()))
             start_resp(status_text, headers)
