@@ -21,7 +21,7 @@ class JsonToJson(Bridge):
         self.value = source
 
     def to(self) -> Jsonizable:
-        if isinstance(self.value, (str, int, float)):
+        if isinstance(self.value, (str, int, float)) or self.value is None:
             return self.value
 
         if isinstance(self.value, list):

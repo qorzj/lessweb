@@ -1,5 +1,5 @@
 from unittest import TestCase
-from lessweb import Application, Response, HttpStatus
+from lessweb import Application, Response, HttpStatus, UploadedFile, Context
 
 
 class TestWiki(TestCase):
@@ -44,3 +44,20 @@ class TestWiki(TestCase):
         app.add_get_mapping('/b', dealer=g)
         with app.test_get('/b', status_code=303, parsejson=False) as ret:
             self.assertEqual(ret, '')
+
+    def test_upload_file(self):
+        def upload(f: UploadedFile, id: int):
+            summary = f.value[:10] + b'...'
+            return {'id': id, 'filename': f.filename, 'value': summary.decode(), 'size': len(f.value)}
+        app = Application()
+        app.add_post_mapping('/upload', dealer=upload)
+        with app.test_post('/upload', {'id': 6, 'f': '@'}, status_code=400, parsejson=False) as ret:
+            self.assertEqual(ret, 'lessweb.BadParamError query:f error:Uploaded File Only')
+
+    def test_context(self):
+        def info(ctx: Context, msg):
+            return {'msg': msg, 'ip': ctx.ip}
+        app = Application()
+        app.add_get_mapping('/info', dealer=info)
+        with app.test_get('/info?msg=lol') as ret:
+            self.assertEqual(ret, {"msg": "lol", "ip": "127.0.0.1"})

@@ -343,7 +343,7 @@ class Application(object):
         path, maybe_query = splitquery(localpart)
         query = maybe_query or ""
         env = env or {}
-        env = dict(env, HTTP_HOST=host, REQUEST_METHOD=method, PATH_INFO=path, QUERY_STRING=query, HTTPS=str(https))
+        env = dict(env, HTTP_HOST=host, REMOTE_ADDR='127.0.0.1', REQUEST_METHOD=method, PATH_INFO=path, QUERY_STRING=query, HTTPS=str(https))
         headers = headers or {}
 
         for k, v in headers.items():
