@@ -121,7 +121,7 @@ class Application(object):
 
     def _load(self, env):
         ctx = Context(self)
-        ctx.environ = ctx.env = env
+        ctx.request.env = ctx.environ = ctx.env = env
         ctx.host = env.get('HTTP_HOST', '[unknown]')
         if env.get('wsgi.url_scheme') in ['http', 'https']:
             ctx.protocol = env['wsgi.url_scheme']
@@ -325,10 +325,10 @@ class Application(object):
             result = _2_build_result(result)
             status = ctx.response.get_status().value
             status_text = '{0} {1}'.format(status.code, status.reason)
-            if not ctx.response.contains_header('Content-Type'):
+            if not ctx.response.get_header('Content-Type'):
                 ctx.response.send_text_html(self.encoding)
             headers = list(ctx.response._headers.items())
-            for cookie in ctx.response._cookies:
+            for cookie in ctx.response._cookies.values():
                 headers.append(('Set-Cookie', cookie.dumps()))
             start_resp(status_text, headers)
             return itertools.chain(result, (b'',))

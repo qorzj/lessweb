@@ -69,7 +69,6 @@ def fetch_param(ctx: Context, fn: Callable):
     fields = ctx.get_inputs()
     for realname, (realtype, has_default) in func_arg_spec(fn).items():
         if realname == 'return': continue
-        print(realname, realtype, has_default)
         if realtype == Context:
             result[realname] = ctx
         elif realtype == Request:

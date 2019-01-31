@@ -29,8 +29,8 @@ def _dictify(fs):
 
 
 class Request:
-    def __init__(self, env: Dict):
-        self.env = env
+    def __init__(self):
+        self.env: Dict = {}
         self._cookies: Dict[str, str] = {}
 
     def _init_cookies(self):
@@ -41,9 +41,9 @@ class Request:
         self._init_cookies()
         return name in self._cookies
 
-    def get_cookie(self, name: str) -> str:
+    def get_cookie(self, name: str) -> Optional[str]:
         self._init_cookies()
-        return self._cookies[name]
+        return self._cookies.get(name)
 
     def get_cookienames(self) -> List[str]:
         self._init_cookies()
@@ -52,11 +52,11 @@ class Request:
     def contains_header(self, name: str) -> bool:
         return wsgi_key_of_header_name(name) in self.env
 
-    def get_header(self, name: str) -> str:
+    def get_header(self, name: str) -> Optional[str]:
         """
         根据http规范，多header应该合并入一个key/value，例如requests的headers就是dict。
         """
-        return self.env[wsgi_key_of_header_name(name)]
+        return self.env.get(wsgi_key_of_header_name(name))
 
     def get_headernames(self) -> List[str]:
         return [s for s in (header_name_of_wsgi_key(k) for k in self.env.keys()) if s]
@@ -64,12 +64,16 @@ class Request:
 
 class Response:
     def __init__(self):
-        self._cookies: List[Cookie] = []
+        self._cookies: Dict[str, Cookie] = {}
         self._status: HttpStatus = HttpStatus.OK
         self._headers: Dict[str, str] = {}
 
-    def add_cookie(self, cookie: Cookie) -> None:
-        self._cookies.append(cookie)
+    def set_cookie(self, name:str, value:str, expires:int=None, path:str='/',
+                   domain:str=None, secure:bool=False, httponly:bool=False) -> None:
+        self._cookies[name] = Cookie(name, value, expires, path, domain, secure, httponly)
+
+    def get_cookie(self, name:str)->Optional[Cookie]:
+        return self._cookies.get(name)
 
     def set_status(self, status: HttpStatus) -> None:
         self._status = status
@@ -82,11 +86,8 @@ class Response:
             raise ValueError('invalid characters in header')
         self._headers[name] = str(value)
 
-    def contains_header(self, name: str) -> bool:
-        return name in self._headers
-
-    def get_header(self, name: str) -> str:
-        return self._headers[name]
+    def get_header(self, name: str) -> Optional[str]:
+        return self._headers.get(name)
 
     def get_headernames(self) -> List[str]:
         return list(self._headers.keys())
@@ -166,7 +167,7 @@ class Context(object):
         self.path: str = ''
         self.query: str = ''
         self.fullpath: str = ''
-        self.request: Request = Request(self.env)
+        self.request: Request = Request()
         self.response: Response = Response()
 
     @property

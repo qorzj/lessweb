@@ -79,7 +79,8 @@ class Cookie:
     secure: bool
     httponly: bool
 
-    def __init__(self, name:str, value:str, expires:int=None, path:str='', domain:str=None, secure:bool=False, httponly:bool=False):
+    def __init__(self, name:str, value:str, expires:int=None, path:str='/',
+                 domain:str=None, secure:bool=False, httponly:bool=False):
         self.name = name
         self.value = value
         self.expires = expires
