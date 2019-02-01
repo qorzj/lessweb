@@ -13,7 +13,10 @@ class Model(metaclass=ABCMeta):
 
 
 class Service(metaclass=ABCMeta):
-    pass
+    ctx: Context
+
+    def __init__(self, ctx: Context):
+        self.ctx = ctx
 
 
 def fetch_model(ctx: Context, model_type: Type[Model]):
