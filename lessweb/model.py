@@ -52,6 +52,7 @@ def fetch_model(ctx: Context, model_type: Type[Model]):
                 setattr(object, realname, realvalue)
             except (ValueError, TypeError) as e:
                 raise BadParamError(query=realname, error=str(e))
+    return object
 
 
 def fetch_param(ctx: Context, fn: Callable):
@@ -111,7 +112,7 @@ class ModelToDict(Bridge):
     def to(self) -> Jsonizable:
         ret = {}
         for name, type_ in get_type_hints(type(self.value)).items():
-            if hasattr(self.value, name):
+            if hasattr(self.value, name) and name[0] != '_':
                 value = self.cast(getattr(self.value, name), type_, Jsonizable)
                 ret[name] = value
         return ret

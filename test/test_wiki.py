@@ -1,5 +1,8 @@
+from typing import Union
 from unittest import TestCase
-from lessweb import Application, Response, HttpStatus, UploadedFile, Context, interceptor
+from lessweb import Application, Response, HttpStatus, UploadedFile, Context, Model, Storage, Bridge, \
+    AnySub, Jsonizable, interceptor, eafp
+from enum import Enum
 
 
 class TestWiki(TestCase):
@@ -172,3 +175,102 @@ class TestWiki(TestCase):
         app.add_get_mapping('/', dealer=home, view=homepage)
         with app.test_get('/?who=John', parsejson=False) as ret:
             self.assertEqual(ret, '<John/>')
+
+    def test_model(self):
+        class Book(Model):
+            id: int
+            name: str
+            author: str
+
+        def edit_book(book: Book):
+            self.assertEqual(str(Storage.of(book)), "<Storage {'id': 123, 'name': 'sicp', 'author': 'MIT'}>")
+            return book
+
+        app = Application()
+        app.add_post_mapping('/book/{id}', dealer=edit_book)
+        with app.test_post('/book/123', data='name=sicp&author=MIT') as ret:
+            self.assertEqual(ret,  {"id": 123, "name": "sicp", "author": "MIT"})
+
+    def test_enum(self):
+        class StrToEnum(Bridge):
+            def of(self, source: Union[str, int]):
+                self.source = eafp(lambda:int(source), source)
+
+            def to(self) -> AnySub(Enum):  # Rank是Enum，但Enum不是Rank。所以要用AnySub，因为AnySub(Enum)是Rank（Gender同理）
+                return self.dist(self.source)  # self.dist由框架赋值
+
+        class EnumToJson(Bridge):
+            def of(self, source: Enum):
+                self.source = source
+
+            def to(self) -> Jsonizable:
+                return {'value': self.source.value, 'show': self.source.show} \
+                    if hasattr(self.source, 'show') else self.source.value
+
+        class Rank(Enum):
+            A = 'A'
+            B = 'B'
+            C = 'C'
+
+        class Gender(Enum):
+            MALE = 1
+            FEMALE = 2
+
+        Gender.MALE.show = '男'
+        Gender.FEMALE.show = '女'
+
+        class User(Model):
+            id: int
+            gender: Gender
+            rank: Rank
+
+        def add_user(user: User):
+            return user
+
+        app = Application()
+        app.add_post_mapping('/user', dealer=add_user)
+        app.add_bridge(StrToEnum)
+        app.add_bridge(EnumToJson)
+        with app.test_post('/user', data='id=6&rank=C&gender=1') as ret:
+            self.assertEqual(ret, {"id": 6, "gender": {"value": 1, "show": "男"}, "rank": "C"})
+
+    def test_bridge_output(self):
+        class Pair:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        class PairPlus(Model):
+            x: int = 0
+            y: Pair
+            _z: int = -1
+
+            @staticmethod
+            def of(pair)->'PairPlus':
+                ret = PairPlus()
+                ret.y = pair
+                return ret
+
+        class PairToJson(Bridge):
+            def of(self, source: Pair):
+                self.source = source
+
+            def to(self) -> Jsonizable:
+                return [
+                    self.source.x,
+                    self.cast(self.source.y, complex, str)
+                ]
+
+        class ComplexToJson(Bridge):
+            def of(self, source: complex):
+                self.source = source
+
+            def to(self) -> str:
+                return str(self.source)
+
+        app = Application()
+        app.add_bridge(PairToJson)
+        app.add_bridge(ComplexToJson)
+        app.add_get_mapping('/pair', dealer=lambda: PairPlus.of(Pair(3, 3+2j)))
+        with app.test_get('/pair') as ret:
+            self.assertEqual(ret, {"x": 0, "y": [3, "(3+2j)"]})

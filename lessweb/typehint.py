@@ -4,6 +4,12 @@ from typing import *
 NoneType = type(None)
 
 
+class AnySub:
+    def __init__(self, core: Type):
+        self.__origin__ = AnySub
+        self.__args__ = (core,)
+
+
 def generic_origin(t):
     """
     Generic's origin type
@@ -96,11 +102,13 @@ def issubtyping(cls: Type, parent: Type):
     origin_prt = generic_origin(parent)
     if origin_cls == Union:
         if origin_prt != Union:
-            return False
+            return all(issubtyping(arg_cls, parent) for arg_cls in generic_args(cls))
         return all(
             any(issubtyping(arg_cls, arg_prt) for arg_prt in generic_args(parent))
             for arg_cls in generic_args(cls)
         )
+    elif origin_cls == AnySub:
+        return issubtyping(parent, generic_args(cls)[0])
     else:
         if origin_prt == Union:
             return any(issubtyping(cls, arg_prt) for arg_prt in generic_args(parent))

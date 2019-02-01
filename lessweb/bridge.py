@@ -8,9 +8,11 @@ T = TypeVar('T')
 
 class Bridge(metaclass=ABCMeta):
     bridges: List[Type['Bridge']]
+    dist: Type
 
-    def __init__(self, bridges):
+    def __init__(self, bridges, dist=None):
         self.bridges = bridges
+        self.dist = dist
 
     @abstractmethod
     def of(self, source):
@@ -32,7 +34,7 @@ class Bridge(metaclass=ABCMeta):
         for bridge in self.bridges:
             bridge_src, bridge_dist = bridge.inspect()
             if issubtyping(source_type, bridge_src) and issubtyping(bridge_dist, dist):
-                b = bridge(self.bridges)
+                b = bridge(self.bridges, dist)
                 b.of(object)
                 return b.to()
         if issubtyping(source_type, dist):

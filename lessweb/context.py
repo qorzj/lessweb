@@ -198,7 +198,7 @@ class Context(object):
                     _ = cgi.FieldStorage(fp=fp, environ=self.env.copy(), keep_blank_values=1)
                 self._fields = _dictify(_)
             except:
-                self._fields = {'__error__': 'invalid fields received'}
+                self._fields = {'__error__': 'invalid form data received'}
         return self._fields
 
     def __call__(self):
