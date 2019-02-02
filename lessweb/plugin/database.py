@@ -25,10 +25,11 @@ class GlobalData:
 
 
 class DbServ(Service):
+    ctx: Context
     db: Session
 
     def __init__(self, ctx: Context):
-        super().__init__(ctx)
+        self.ctx = ctx
         self.db = ctx.get_param(DatabaseKey.db)
 
 
