@@ -1,4 +1,4 @@
-from typing import Any, overload, Iterator
+from typing import Any, overload, Iterator, Type, TypeVar, get_type_hints, Iterable, List
 from urllib.parse import quote
 from enum import Enum
 
@@ -123,6 +123,44 @@ def make_session()->Iterator[Session]:
     finally:
         session.close()
 
+
+T = TypeVar('T')
+U = TypeVar('U')
+
+
+def cast_model(modelCls: Type[T], tblObjs) -> T:
+    modelObj = modelCls()
+    modelKeys = get_type_hints(modelCls)
+    if tblObjs is None:
+        return None
+
+    if not isinstance(tblObjs, Iterable):
+        for key, value in tblObjs.__dict__.items():
+            if key in modelKeys:
+                setattr(modelObj, key, value)
+        return modelObj
+    elif hasattr(tblObjs, 'keys'):
+        updated = set()
+        for rowkey in tblObjs.keys():
+            tblObj = getattr(tblObjs, rowkey)
+            if rowkey.startswith('Tbl'):
+                for key, value in tblObj.__dict__.items():
+                    if key in modelKeys and key not in updated:
+                        setattr(modelObj, key, value)
+                        updated.add(key)
+            elif rowkey not in updated:
+                setattr(modelObj, rowkey, tblObj)
+                updated.add(rowkey)
+
+        return modelObj if updated else None
+    else:
+        raise NotImplementedError('Cannot cast %s to Model' % str(tblObjs))
+
+
+def cast_models(modelCls: Type[T], tblObjsList) -> List[T]:
+    return [cast_model(modelCls, x) for x in tblObjsList]
+
+
 """
 ==== Tutorial: SQLALCHEMY USAGE ====
 
@@ -225,14 +263,18 @@ query = session.query(Cookie).filter(
     )
 )
 
-#UPDATE
+#UPDATE ONE
 query = session.query(Cookie)
 cc_cookie = query.filter(Cookie.cookie_name == "chip").first()
 cc_cookie.quantity = cc_cookie.quantity + 120
 session.commit()
 print(cc_cookie.quantity)  #output: 132
 
-#DELETE
+#UPDATE ALL
+query.filter(Cookie.cookie_name == "chip").update({'quantity': Cookie.quantity+120})
+session.commit()
+
+#DELETE ONE
 query = session.query(Cookie)
 query = query.filter(Cookie.cookie_name == "butter")
 
@@ -241,6 +283,9 @@ session.delete(dcc_cookie)
 session.commit()
 dcc_cookie = query.first()
 print(dcc_cookie)  #output: None
+
+#DELETE ALL
+query.filter(Cookie.cookie_name == "butter").delete()
 
 ##USING RELATIONSHIPS IN QUERIES
 query = session.query(Order.order_id, User.username, User.phone, Cookie.cookie_name, LineItem.quantity, LineItem.extended_cost)
