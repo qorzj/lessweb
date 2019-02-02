@@ -1,5 +1,6 @@
-from typing import Any, overload, List
+from typing import Any, overload, Iterator
 from urllib.parse import quote
+from enum import Enum
 
 from contextlib import contextmanager
 from sqlalchemy import create_engine
@@ -8,8 +9,13 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import as_declarative, declared_attr
 
 from ..context import Context
+from ..model import Service
 
 __all__ = ["global_data", "DbModel", "init", "processor", "create_all", "make_session"]
+
+
+class DatabaseKey(Enum):
+    db = 1
 
 
 class GlobalData:
@@ -18,8 +24,12 @@ class GlobalData:
     autocommit: bool
 
 
-class DatabaseCtx(Context):
-    db : Session
+class DbServ(Service):
+    db: Session
+
+    def __init__(self, ctx: Context):
+        super().__init__(ctx)
+        self.db = ctx.get_param(DatabaseKey.db)
 
 
 global_data = GlobalData()
@@ -71,19 +81,20 @@ def init(*, protocol=None, username=None, password=None, host=None, port:int=Non
     global_data.autocommit = autocommit
 
 
-def processor(ctx: DatabaseCtx):
+def processor(ctx: Context):
+    db = global_data.db_session_maker()
     try:
-        ctx.db = global_data.db_session_maker()
+        ctx.set_param(DatabaseKey.db, db)
         if global_data.autocommit:
-            with ctx.db.begin():
+            with db.begin():
                 return ctx()
         else:
             return ctx()
     except:
-        ctx.db.rollback()
+        db.rollback()
         raise
     finally:
-        ctx.db.close()
+        db.close()
 
 
 def create_all(*DbModelClass):
@@ -100,7 +111,7 @@ def create_all(*DbModelClass):
 
 
 @contextmanager
-def make_session():
+def make_session()->Iterator[Session]:
     session = None
     try:
         session = global_data.db_session_maker()
@@ -135,11 +146,11 @@ index.py: create_all(DbUser)  #表已存在则忽略，不会清空数据或改�
 #INSERT
 ##ADD A COOKIE
 cc_cookie = Cookie(cookie_name='chip', cookie_recipe_url='http://some.me', cookie_sku='CC01', quantity=12, unit_cost=0.50, category=Category.A, intro='')
-ctx.db.add(cc_cookie)
-ctx.db.commit()
+dbserv.db.add(cc_cookie)
+dbserv.db.commit()
 print(cc_cookie.cookie_id)  #output: 1
 
-session = ctx.db
+session = dbserv.db
 
 #QUERY
 ##ALL THE COOKIES

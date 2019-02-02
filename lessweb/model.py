@@ -19,6 +19,25 @@ class Service(metaclass=ABCMeta):
         self.ctx = ctx
 
 
+def fetch_service(ctx: Context, service_type: Type[Service]):
+    self_flag = True
+    params = {}
+    for realname, (realtype, _) in func_arg_spec(service_type.__init__).items():
+        if self_flag or realname == 'return':
+            self_flag = False
+        elif realtype == Context:
+            params[realname] = ctx
+        elif realtype == Request:
+            params[realname] = ctx.request
+        elif realtype == Response:
+            params[realname] = ctx.response
+        elif isinstance(realtype, type) and issubclass(realtype, Service):
+            params[realname] = realtype(ctx)
+        else:
+            raise BadParamError(query=realname, error=str(service_type)+'.__init__ Param Type Is Wrong')
+    return service_type(**params)
+
+
 def fetch_model(ctx: Context, model_type: Type[Model]):
     """
         >>> from lessweb.storage import Storage
@@ -80,7 +99,7 @@ def fetch_param(ctx: Context, fn: Callable):
         elif realtype == Response:
             result[realname] = ctx.response
         elif isinstance(realtype, type) and issubclass(realtype, Service):
-            result[realname] = realtype(ctx)
+            result[realname] = fetch_service(ctx, realtype)
         elif isinstance(realtype, type) and issubclass(realtype, Model):
             result[realname] = fetch_model(ctx, realtype)
         else:
@@ -91,7 +110,7 @@ def fetch_param(ctx: Context, fn: Callable):
                 elif generic_origin(realtype) == Optional:
                     result[realname] = None
                 else:
-                    raise NeedParamError(query=realname, doc=realname)
+                    raise NeedParamError(query=realname, doc='Missing Required Param')
             elif realtype == UploadedFile:
                 queryvalue = fields[queryname]
                 if not isinstance(queryvalue, UploadedFile):
