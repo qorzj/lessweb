@@ -111,17 +111,19 @@ def create_all(*DbModelClass):
         db_class.metadata.create_all(global_data.db_engine)
 
 
-@contextmanager
-def make_session()->Iterator[Session]:
-    session = None
-    try:
-        session = global_data.db_session_maker()
-        yield session
-    except:
-        session.rollback()
-        raise
-    finally:
-        session.close()
+class make_session:
+    session: Session
+
+    def __init__(self):
+        self.session = global_data.db_session_maker()
+
+    def __enter__(self) -> Session:
+        return self.session
+
+    def __exit__(self, type_, value, traceback):
+        self.session.rollback()
+        self.session.close()
+        raise value
 
 
 T = TypeVar('T')
