@@ -16,7 +16,7 @@ class Service(metaclass=ABCMeta):
     pass
 
 
-def fetch_service(ctx: Context, service_type: Type[Service]):
+def fetch_service(ctx: Context, service_type: Type):
     self_flag = True
     params = {}
     for realname, (realtype, _) in func_arg_spec(service_type.__init__).items():
@@ -28,10 +28,11 @@ def fetch_service(ctx: Context, service_type: Type[Service]):
             params[realname] = ctx.request
         elif realtype == Response:
             params[realname] = ctx.response
-        elif isinstance(realtype, type) and issubclass(realtype, Service):
-            params[realname] = realtype(ctx)
+        elif isinstance(realtype, type) and realtype != service_type \
+                and issubclass(realtype, Service):
+            params[realname] = fetch_service(ctx, realtype)
         else:
-            raise BadParamError(query=realname, error=str(service_type)+'.__init__ Param Type Is Wrong')
+            raise KeyError('%s.__init__(%s) param type is empty or wrong!' % (str(service_type), realname))
     return service_type(**params)
 
 
