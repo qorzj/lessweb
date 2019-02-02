@@ -154,7 +154,7 @@ def cast_model(modelCls: Type[T], tblObjs) -> T:
 
         return modelObj if updated else None
     else:
-        raise NotImplementedError('Cannot cast %s to Model' % str(tblObjs))
+        raise TypeError('Cannot cast %s to Model' % str(tblObjs))
 
 
 def cast_models(modelCls: Type[T], tblObjsList) -> List[T]:
