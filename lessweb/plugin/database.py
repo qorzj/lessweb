@@ -2,7 +2,6 @@ from typing import Any, overload, Iterator, Type, TypeVar, get_type_hints, Itera
 from urllib.parse import quote
 from enum import Enum
 
-from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.session import Session
@@ -11,7 +10,8 @@ from sqlalchemy.ext.declarative import as_declarative, declared_attr
 from ..context import Context
 from ..model import Service
 
-__all__ = ["global_data", "DbModel", "init", "processor", "create_all", "make_session"]
+__all__ = ["global_data", "DbModel", "DbServ", "init", "processor", "create_all", "make_session",
+           "cast_model", "cast_models"]
 
 
 class DatabaseKey(Enum):
