@@ -22,7 +22,7 @@ def generic_origin(t):
     >>> generic_origin(Union[str, int, None]) == Union
     True
     """
-    return getattr(t, '__origin__', t)
+    return getattr(t, '__origin__', t) or t
 
 
 def generic_args(t):

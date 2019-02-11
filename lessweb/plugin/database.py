@@ -136,25 +136,23 @@ def cast_model(modelCls: Type[T], tblObjs) -> T:
     if tblObjs is None:
         return None
 
-    if not isinstance(tblObjs, Iterable):
+    if not isinstance(tblObjs, Iterable):  # 单个对象
         for key, value in tblObjs.__dict__.items():
             if key in modelKeys:
                 setattr(modelObj, key, value)
         return modelObj
-    elif hasattr(tblObjs, 'keys'):
-        updated = set()
+    elif hasattr(tblObjs, 'keys'):  # sqlalchemy.util._collections.result
         for rowkey in tblObjs.keys():
-            tblObj = getattr(tblObjs, rowkey)
-            if rowkey.startswith('Tbl'):
-                for key, value in tblObj.__dict__.items():
-                    if key in modelKeys and key not in updated:
+            rowVal = getattr(tblObjs, rowkey)
+            # if rowkey.startswith('Tbl'):
+            if isinstance(rowVal, DbModel):  # DbModel
+                for key, value in rowVal.__dict__.items():
+                    if key in modelKeys:
                         setattr(modelObj, key, value)
-                        updated.add(key)
-            elif rowkey not in updated:
-                setattr(modelObj, rowkey, tblObj)
-                updated.add(rowkey)
+            else:  # 普通对象
+                setattr(modelObj, rowkey, rowVal)
 
-        return modelObj if updated else None
+        return modelObj
     else:
         raise TypeError('Cannot cast %s to Model' % str(tblObjs))
 
