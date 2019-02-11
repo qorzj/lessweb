@@ -72,8 +72,11 @@ class Response:
                    domain:str=None, secure:bool=False, httponly:bool=False) -> None:
         self._cookies[name] = Cookie(name, value, expires, path, domain, secure, httponly)
 
-    def get_cookie(self, name:str)->Optional[Cookie]:
+    def get_cookie(self, name:str) -> Optional[Cookie]:
         return self._cookies.get(name)
+
+    def del_cookie(self, name:str) -> None:
+        self._cookies.pop(name, None)
 
     def set_status(self, status: HttpStatus) -> None:
         self._status = status
@@ -89,11 +92,18 @@ class Response:
     def get_header(self, name: str) -> Optional[str]:
         return self._headers.get(name)
 
+    def del_header(self, name: str) -> None:
+        return self._headers.pop(name, None)
+
     def get_headernames(self) -> List[str]:
         return list(self._headers.keys())
 
-    def clear_headers(self) -> None:
+    def clear(self) -> None:
+        """
+        Clear headers and cookies.
+        """
         self._headers.clear()
+        self._cookies.clear()
 
     def send_access_allow(self, allow_headers: List[str]=None) -> None:
         allow_headers = allow_headers or []
