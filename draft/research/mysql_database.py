@@ -4,7 +4,7 @@ from lessweb import Application
 from lessweb.plugin import database
 from lessweb.plugin.database import DbServ
 
-from sqlalchemy import Column, Integer, Text, String, Enum as ENUM, func
+from sqlalchemy import Column, Integer, Text, String, Enum as ENUM, func, UniqueConstraint
 from lessweb.plugin.database import DbModel, cast_model
 from lessweb import Model
 from enum import Enum
@@ -19,6 +19,7 @@ class TblBook(DbModel):  # 表名默认为'TblBook'
     id = Column(Integer, primary_key=True)
     name = Column(Text)
     author = Column(String(64))
+    __table_args__ = (UniqueConstraint('id', 'author', name='_uniq_id_author'),)
 
 
 class TblUser(DbModel):

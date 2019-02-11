@@ -165,8 +165,9 @@ def cast_models(modelCls: Type[T], tblObjsList) -> List[T]:
 ==== Tutorial: SQLALCHEMY USAGE ====
 
 #DEFINING MODELS
+import datetime
 from lessweb.plugin.database import DbModel 
-from sqlalchemy import Column, Integer, Numeric, String, Text, Enum
+from sqlalchemy import Column, Integer, Numeric, String, Text, Enum, DateTime, UniqueConstraint
 class UserInfo(DbModel):
     __tablename__ = 'tbl_cookies'
     cookie_id = Column(Integer, primary_key=True)
@@ -177,6 +178,8 @@ class UserInfo(DbModel):
     unit_cost = Column(Numeric(12, 2))
     category = Column(Enum(Category))
     intro = Column(Text)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    __table_args__ = (UniqueConstraint('cookie_id', 'cookie_name', name='_uniq_id_name'),)
 
 #CREATE TABLE
 from lessweb.plugin.database import create_all
