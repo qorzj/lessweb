@@ -1,5 +1,3 @@
-import sys
-sys.path.append('.')
 from lessweb import Application
 from lessweb.plugin import database
 from lessweb.plugin.database import DbServ

@@ -6,10 +6,15 @@ from lessweb.webapi import NeedParamError, BadParamError, UploadedFile
 from lessweb.typehint import generic_origin
 from lessweb.garage import BaseBridge, Bridge, Jsonizable
 from lessweb.utils import func_arg_spec
+from lessweb.storage import Storage
 
 
 class Model(metaclass=ABCMeta):
-    pass
+    def __eq__(self, other):
+        return Storage.of(self) == Storage.of(other)
+
+    def __repr__(self):
+        return '<Model ' + repr(Storage.of(self)) + '>'
 
 
 class Service(metaclass=ABCMeta):

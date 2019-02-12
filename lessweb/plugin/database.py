@@ -1,4 +1,4 @@
-from typing import Any, overload, Iterator, Type, TypeVar, get_type_hints, Iterable, List
+from typing import Any, overload, Type, TypeVar, get_type_hints, Iterable, List
 from urllib.parse import quote
 from enum import Enum
 
@@ -15,7 +15,7 @@ __all__ = ["global_data", "DbModel", "DbServ", "init", "processor", "create_all"
 
 
 class DatabaseKey(Enum):
-    db = 1
+    session = 1
 
 
 class GlobalData:
@@ -30,7 +30,7 @@ class DbServ(Service):
 
     def __init__(self, ctx: Context):
         self.ctx = ctx
-        self.db = ctx.get_param(DatabaseKey.db)
+        self.db = ctx.get_param(DatabaseKey.session)
 
 
 global_data = GlobalData()
