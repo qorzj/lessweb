@@ -24,7 +24,7 @@ class TestWiki(TestCase):
         with app.test_get('/a?x=3') as ret:
             self.assertEqual({"sum": 103}, ret)
         with app.test_get('/add', status_code=400, parsejson=False) as ret:
-            self.assertEqual('lessweb.NeedParamError query:x doc:x', ret)
+            self.assertEqual('lessweb.NeedParamError query:x doc:Missing Required Param', ret)
         with app.test_get('/addd?x=1&y=x', status_code=400, parsejson=False) as ret:
             self.assertEqual("lessweb.BadParamError query:y error:invalid literal for int() with base 10: 'x'", ret)
 

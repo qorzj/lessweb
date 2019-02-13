@@ -7,7 +7,7 @@ from io import BytesIO
 from lessweb.storage import Storage
 from lessweb.webapi import UploadedFile, Cookie, HttpStatus
 from lessweb.webapi import header_name_of_wsgi_key, wsgi_key_of_header_name
-from lessweb.webapi import parse_cookie
+from lessweb.webapi import parse_cookie, mimetypes
 from lessweb.utils import fields_in_query
 from lessweb.garage import Jsonizable
 
@@ -119,8 +119,12 @@ class Response:
     def send_redirect(self, location: str) -> None:
         self.set_header('Location', location)
 
-    def send_text_html(self, encoding: str):
-        self.set_header('Content-Type', 'text/html; charset=' + encoding)
+    def send_content_type(self, mimekey='html', encoding: str=''):
+        mimekey = mimekey.lower()
+        if encoding:
+            self.set_header('Content-Type', '%s; charset=%s' % (mimetypes[mimekey], encoding))
+        else:
+            self.set_header('Content-Type', '%s' % mimetypes[mimekey])
 
 
 class Context(object):

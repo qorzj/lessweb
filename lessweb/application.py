@@ -178,7 +178,6 @@ class Application(object):
                     f = interceptor(itr.dealer)(f)
             return f(ctx)
         except (NeedParamError, BadParamError) as e:
-            ctx.response.send_text_html(self.encoding)
             ctx.response.set_status(HttpStatus.BadRequest)
             return repr(e)
         except NotFoundError as e:
@@ -288,7 +287,15 @@ class Application(object):
                 application = app.wsgifunc()
         """
         def wsgi(env, start_resp):
-            def _1_peep(iterator):
+            def _1_content_type(chunk, ctx):
+                if isinstance(chunk, str) or chunk is None:
+                    ctx.response.send_content_type(encoding=self.encoding)
+                elif isinstance(chunk, bytes):
+                    pass
+                else:
+                    ctx.response.send_content_type(mimekey='json', encoding=self.encoding)
+
+            def _1_peep(iterator, ctx):
                 """Peeps into an iterator by doing an iteration
                 and returns an equivalent iterator.
                 """
@@ -299,15 +306,20 @@ class Application(object):
                     firstchunk = next(iterator)
                 except StopIteration:
                     firstchunk = ''
+                _1_content_type(firstchunk, ctx)
                 return itertools.chain([firstchunk], iterator)
 
             ctx = self._load(env)
             try:
                 resp = self._handle_with_dealers(ctx)
-                result = _1_peep(resp) if isinstance(resp, GeneratorType) else (resp,)
+                if isinstance(resp, GeneratorType):
+                    result = _1_peep(resp, ctx)
+                else:
+                    _1_content_type(resp, ctx)
+                    result = (resp,)
             except Exception as e:
                 logging.exception(e)
-                ctx.response.send_text_html(self.encoding)
+                ctx.response.send_content_type(encoding=self.encoding)
                 ctx.response.set_status(HttpStatus.InternalServerError)
                 result = (traceback.format_exc(),)
 
@@ -325,8 +337,6 @@ class Application(object):
             result = _2_build_result(result)
             status = ctx.response.get_status().value
             status_text = '{0} {1}'.format(status.code, status.reason)
-            if not ctx.response.get_header('Content-Type'):
-                ctx.response.send_text_html(self.encoding)
             headers = list(ctx.response._headers.items())
             for cookie in ctx.response._cookies.values():
                 headers.append(('Set-Cookie', cookie.dumps()))

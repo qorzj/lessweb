@@ -166,6 +166,7 @@ def Module(from_:str, import_:str, as_:str, path='/__target__'):
     )
 
 
+# Transcrypt only
 class Kit:
     def ajax(self, method, url, data=None, headers=None, contentType=None, onsuccess=None, onerror=None, **kw):
         """
@@ -210,3 +211,25 @@ class Kit:
 
     def goto(self, url):
         location.assign(url)
+
+
+# Transcrypt only
+class Storage:
+    def __init__(self, name, expire=False):
+        """
+        :param expire: True=sessionStorage, False=localStorage
+        """
+        self.name = name
+        self.expire = expire
+
+    def get(self):
+        if self.expire:
+            return JSON.parse(sessionStorage.getItem(self.name))
+        else:
+            return JSON.parse(localStorage.getItem(self.name))
+
+    def set(self, value):
+        if self.expire:
+            sessionStorage.setItem(self.name, JSON.stringify(value))
+        else:
+            localStorage.setItem(self.name, JSON.stringify(value))
