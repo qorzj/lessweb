@@ -1,6 +1,11 @@
 """
 Dom Element
 """
+# __pragma__ ('skip')
+import json
+# __pragma__ ('noskip')
+
+
 def uncapitalize_name(name):
     """
         >>> uncapitalize_name("Href")
@@ -92,39 +97,39 @@ def HtmlPage(*nodes, title='Welcome', https=False):
     )
 
 
-def FlexRow(*nodes, id=None):
+def FlexRow(*nodes, Id=None):
     return Div(
         *nodes,
-        Class='weui-flex', Id=id,
+        Class='weui-flex', Id=Id,
     )
 
 
-def FlexItem(*nodes, id=None):
+def FlexItem(*nodes, Id=None):
     return Div(
         *nodes,
-        Class='weui-flex__item', Id=id,
+        Class='weui-flex__item', Id=Id,
     )
 
 
-def Button(text, onclick:str, primary=False, warn=False, id=None):
+def Button(text, *, Onclick:str, primary=False, warn=False, Id=None):
     if primary: btn_class = ' weui-btn_primary'
     elif warn: btn_class = ' weui-btn_warn'
     else: btn_class = ' weui-btn_default'
     return Div(
         text,
-        Tag='A', Href=Div.JSVOID, Onclick=onclick, Class='weui-btn weui-btn_mini' + btn_class, Id=id,
+        Tag='A', Href=Div.JSVOID, Onclick=Onclick, Class='weui-btn weui-btn_mini' + btn_class, Id=Id,
     )
 
 
-def TextInput(title, id):
+def TextInput(title, *, Id):
     return Div(
         Div(
             title,
-            Tag='label', Class='weui-cells__title', For=id,
+            Tag='label', Class='weui-cells__title', For=Id,
         ), Div(
             Div(
                 Div(
-                    Div(Tag='input', Id=id, Class='weui-input', Type='text', Placeholder=''),
+                    Div(Tag='input', Id=Id, Class='weui-input', Type='text', Placeholder=''),
                     Class='weui-cell__bd'
                 ),
                 Class='weui-cell',
@@ -134,15 +139,15 @@ def TextInput(title, id):
     )
 
 
-def TextArea(title, id, rows:int=3):
+def TextArea(title, *, Id, Rows:int=3):
     return Div(
         Div(
             title,
-            Tag='label', Class='weui-cells__title', For=id,
+            Tag='label', Class='weui-cells__title', For=Id,
         ), Div(
             Div(
                 Div(
-                    Div('', Tag='textarea', Id=id, Class='weui-textarea', Placeholder='', Rows=str(rows)),
+                    Div('', Tag='textarea', Id=Id, Class='weui-textarea', Placeholder='', Rows=str(Rows)),
                     Class='weui-cell__bd',
                 ),
                 Class='weui-cell',
@@ -152,23 +157,24 @@ def TextArea(title, id, rows:int=3):
     )
 
 
-def Link(text, url, id=None):
-    return Div(text, Tag='a', Href=url, Id=id)
+def Link(text, *, Url, Id=None):
+    return Div(text, Tag='a', Href=Url, Id=Id)
 
 
-def Module(from_:str, import_:str, as_:str, path='/__target__'):
+def Module(From:str, Import:str, As:str, Path='/__target__'):
     """
-    example: Module(from_='home', import_='Action()', as_='home_action')
+    example: Module(From='home', Import='Action()', AS='home_action')
     """
     return Div(
-        "import * as "+from_+" from '"+path+"/"+from_+".js'; window."+as_+" = "+from_+"."+import_+";",
+        "import * as "+From+" from '"+Path+"/"+From+".js'; window."+As+" = "+From+"."+Import+";",
         Tag='script', Type='module'
     )
 
 
 # Transcrypt only
 class Kit:
-    def ajax(self, method, url, data=None, headers=None, contentType=None, onsuccess=None, onerror=None, **kw):
+    @staticmethod
+    def ajax(method, url, data=None, headers=None, contentType=None, onsuccess=None, onerror=None, **kw):
         """
         :param onsuccess: function(data, status, xhr): when request succeeds
         :param onerror: function(xhr, errorType, error): timeout, parse error, or status code not in HTTP 2xx
@@ -182,7 +188,8 @@ class Kit:
         if onerror is not None: kw['error'] = onerror
         Zepto.ajax(kw)
 
-    def get_json(self, url, data, onsuccess):
+    @staticmethod
+    def get_json(url, data, onsuccess):
         """
         :param onsuccess: function(data, status, xhr): when request succeeds
         """
@@ -191,25 +198,49 @@ class Kit:
         else:
             Zepto.getJSON(url, data, onsuccess)
 
-    def select(self, selector):
+    @staticmethod
+    def select(selector):
         return Zepto(selector)
 
-    def onload(self, handler):
+    @staticmethod
+    def onload(handler):
         return Zepto(handler)
 
-    def print(self, obj):
+    @staticmethod
+    def param(data):
+        return Zepto.param(data)
+
+    @staticmethod
+    def parseJSON(text):
+        # __pragma__ ('skip')
+        if ...: return json.loads(text)
+        # __pragma__ ('noskip')
+        return Zepto.parseJSON(text)
+
+    @staticmethod
+    def stringifyJSON(data):
+        # __pragma__ ('skip')
+        if...: return json.dumps(data)
+        # __pragma__ ('noskip')
+        return JSON.stringify(data)
+
+    @staticmethod
+    def print(obj):
         console.log(obj)
 
-    def alert(self, text, ondone=None):
+    @staticmethod
+    def alert(text, ondone=None):
         if ondone is None:
             weui.alert(text)
         else:
             weui.alert(text, ondone)
 
-    def reload(self, url):
+    @staticmethod
+    def reload(url):
         location.reload(url)
 
-    def goto(self, url):
+    @staticmethod
+    def goto(url):
         location.assign(url)
 
 

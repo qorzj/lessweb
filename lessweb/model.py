@@ -55,7 +55,8 @@ def fetch_model(ctx: Context, model_type: Type[Model]):
         >>> assert Storage.of(model) == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
     """
     object = model_type()
-    bridge = BaseBridge(ctx.app.bridges)
+    bridge = BaseBridge()
+    bridge.init_for_cast(ctx.app.bridges)
     fields = ctx.get_inputs()
     for realname, realtype in get_type_hints(model_type).items():
         if realname[0] == '_': continue  # 私有成员不赋值
@@ -91,7 +92,8 @@ def fetch_param(ctx: Context, fn: Callable):
         >>> assert param == {'ctx': ctx, 'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
     """
     result = {}
-    bridge = BaseBridge(ctx.app.bridges)
+    bridge = BaseBridge()
+    bridge.init_for_cast(ctx.app.bridges)
     fields = ctx.get_inputs()
     for realname, (realtype, has_default) in func_arg_spec(fn).items():
         if realname == 'return': continue
@@ -129,9 +131,7 @@ def fetch_param(ctx: Context, fn: Callable):
 
 
 class ModelToDict(Bridge):
-    value: Model
-
-    def of(self, source: Model):
+    def __init__(self, source: Model):
         self.value = source
 
     def to(self) -> Jsonizable:

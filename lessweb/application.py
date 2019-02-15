@@ -21,7 +21,7 @@ from lessweb.context import Context
 from lessweb.model import fetch_param, ModelToDict
 from lessweb.storage import Storage
 from lessweb.utils import eafp, re_standardize
-from lessweb.bridge import Bridge
+from lessweb.bridge import Bridge, assert_valid_bridge
 from lessweb.garage import Jsonizable, BaseBridge, JsonToJson
 
 
@@ -205,6 +205,7 @@ class Application(object):
         self.interceptors.insert(0, Interceptor(pattern, method, dealer, patternobj))
 
     def add_bridge(self, bridge: Type[Bridge]):
+        assert_valid_bridge(bridge)
         self.bridges.append(bridge)
 
     def add_mapping(self, pattern, method, dealer, view=None):
@@ -287,15 +288,7 @@ class Application(object):
                 application = app.wsgifunc()
         """
         def wsgi(env, start_resp):
-            def _1_content_type(chunk, ctx):
-                if isinstance(chunk, str) or chunk is None:
-                    ctx.response.send_content_type(encoding=self.encoding)
-                elif isinstance(chunk, bytes):
-                    pass
-                else:
-                    ctx.response.send_content_type(mimekey='json', encoding=self.encoding)
-
-            def _1_peep(iterator, ctx):
+            def _1_peep(iterator):
                 """Peeps into an iterator by doing an iteration
                 and returns an equivalent iterator.
                 """
@@ -306,17 +299,23 @@ class Application(object):
                     firstchunk = next(iterator)
                 except StopIteration:
                     firstchunk = ''
-                _1_content_type(firstchunk, ctx)
                 return itertools.chain([firstchunk], iterator)
 
             ctx = self._load(env)
             try:
+                mimekey = 'html'
                 resp = self._handle_with_dealers(ctx)
                 if isinstance(resp, GeneratorType):
-                    result = _1_peep(resp, ctx)
+                    result = _1_peep(resp)
                 else:
-                    _1_content_type(resp, ctx)
+                    if not isinstance(resp, (bytes, str)) and resp is not None:
+                        baseBridge = BaseBridge()
+                        baseBridge.init_for_cast(self.bridges)
+                        resp = json.dumps(baseBridge.cast(resp, type(resp), Jsonizable))
+                        mimekey = 'json'
                     result = (resp,)
+                if not ctx.response.get_header('Content-Type'):
+                    ctx.response.send_content_type(mimekey=mimekey, encoding=self.encoding)
             except Exception as e:
                 logging.exception(e)
                 ctx.response.send_content_type(encoding=self.encoding)
@@ -332,7 +331,7 @@ class Application(object):
                     elif r is None:
                         yield b''
                     else:
-                        yield json.dumps(BaseBridge(self.bridges).cast(r, type(r), Jsonizable)).encode(self.encoding)
+                        yield str(r).encode(self.encoding)
 
             result = _2_build_result(result)
             status = ctx.response.get_status().value

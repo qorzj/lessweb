@@ -3,6 +3,7 @@ import cgi
 import json
 
 from io import BytesIO
+from requests.structures import CaseInsensitiveDict
 
 from lessweb.storage import Storage
 from lessweb.webapi import UploadedFile, Cookie, HttpStatus
@@ -66,7 +67,7 @@ class Response:
     def __init__(self):
         self._cookies: Dict[str, Cookie] = {}
         self._status: HttpStatus = HttpStatus.OK
-        self._headers: Dict[str, str] = {}
+        self._headers = CaseInsensitiveDict()
 
     def set_cookie(self, name:str, value:str, expires:int=None, path:str='/',
                    domain:str=None, secure:bool=False, httponly:bool=False) -> None:

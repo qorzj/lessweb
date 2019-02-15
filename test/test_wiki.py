@@ -193,14 +193,14 @@ class TestWiki(TestCase):
 
     def test_enum(self):
         class StrToEnum(Bridge):
-            def of(self, source: Union[str, int]):
+            def __init__(self, source: Union[str, int]):
                 self.source = eafp(lambda:int(source), source)
 
             def to(self) -> AnySub(Enum):  # Rank是Enum，但Enum不是Rank。所以要用AnySub，因为AnySub(Enum)是Rank（Gender同理）
                 return self.dist(self.source)  # self.dist由框架赋值
 
         class EnumToJson(Bridge):
-            def of(self, source: Enum):
+            def __init__(self, source: Enum):
                 self.source = source
 
             def to(self) -> Jsonizable:
@@ -252,7 +252,7 @@ class TestWiki(TestCase):
                 return ret
 
         class PairToJson(Bridge):
-            def of(self, source: Pair):
+            def __init__(self, source: Pair):
                 self.source = source
 
             def to(self) -> Jsonizable:
@@ -262,7 +262,7 @@ class TestWiki(TestCase):
                 ]
 
         class ComplexToJson(Bridge):
-            def of(self, source: complex):
+            def __init__(self, source: complex):
                 self.source = source
 
             def to(self) -> str:

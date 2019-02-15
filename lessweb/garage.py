@@ -7,7 +7,7 @@ Jsonizable = Union[str, int, float, Dict, List, None]
 
 
 class BaseBridge(Bridge):
-    def of(self, source: Any):
+    def __init__(self):
         pass
 
     def to(self)->Any:
@@ -15,9 +15,7 @@ class BaseBridge(Bridge):
 
 
 class JsonToJson(Bridge):
-    value: Jsonizable
-
-    def of(self, source: Jsonizable):
+    def __init__(self, source: Jsonizable):
         self.value = source
 
     def to(self) -> Jsonizable:
