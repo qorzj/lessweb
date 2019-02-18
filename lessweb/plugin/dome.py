@@ -98,6 +98,8 @@ def HtmlPage(*nodes, title='Welcome', https=False):
 
 
 def FlexRow(*nodes, Id=None):
+    if len(nodes) == 0:
+        nodes = ['']
     return Div(
         *nodes,
         Class='weui-flex', Id=Id,
@@ -105,6 +107,8 @@ def FlexRow(*nodes, Id=None):
 
 
 def FlexItem(*nodes, Id=None):
+    if len(nodes) == 0:
+        nodes = ['']
     return Div(
         *nodes,
         Class='weui-flex__item', Id=Id,
@@ -121,7 +125,7 @@ def Button(text, *, Onclick:str, primary=False, warn=False, Id=None):
     )
 
 
-def TextInput(title, *, Id):
+def TextInput(title, *, Id, Name=None, Value=''):
     return Div(
         Div(
             title,
@@ -129,7 +133,7 @@ def TextInput(title, *, Id):
         ), Div(
             Div(
                 Div(
-                    Div(Tag='input', Id=Id, Class='weui-input', Type='text', Placeholder=''),
+                    Div(Tag='input', Id=Id, Class='weui-input', Type='text', Name=Name, Value=Value, Placeholder=''),
                     Class='weui-cell__bd'
                 ),
                 Class='weui-cell',
@@ -139,7 +143,25 @@ def TextInput(title, *, Id):
     )
 
 
-def TextArea(title, *, Id, Rows:int=3):
+def FileInput(title, *, Id, Name=None):
+    return Div(
+        Div(
+            title,
+            Tag='label', Class='weui-cells__title',
+        ), Div(
+            Div(
+                Div(
+                    Div(Tag='input', Id=Id, Class='weui-input', Type='file', Name=Name),
+                    Class='weui-cell__bd'
+                ),
+                Class='weui-cell',
+            ),
+            Class='weui-cells',
+        )
+    )
+
+
+def TextArea(title, *, Id, Name=None, Rows:int=3):
     return Div(
         Div(
             title,
@@ -147,7 +169,7 @@ def TextArea(title, *, Id, Rows:int=3):
         ), Div(
             Div(
                 Div(
-                    Div('', Tag='textarea', Id=Id, Class='weui-textarea', Placeholder='', Rows=str(Rows)),
+                    Div('', Tag='textarea', Id=Id, Class='weui-textarea', Placeholder='', Name=Name, Rows=str(Rows)),
                     Class='weui-cell__bd',
                 ),
                 Class='weui-cell',
@@ -208,7 +230,13 @@ class Kit:
 
     @staticmethod
     def param(data):
-        return Zepto.param(data)
+        if data is None:
+            return None
+        tmp = {}
+        for k, v in data.items():
+            if v is not None:
+                tmp[k] = v
+        return Zepto.param(tmp)
 
     @staticmethod
     def parseJSON(text):
@@ -242,6 +270,17 @@ class Kit:
     @staticmethod
     def goto(url):
         location.assign(url)
+
+    @staticmethod
+    def form_data(*selectors):
+        formData = eval('new FormData()')
+        for selector in selectors:
+            div = Kit.select(selector)
+            if div.attr('type') == 'file':
+                formData.append(div.attr('name'), div[0].files[0])
+            else:
+                formData.append(div.attr('name'), div.val())
+        return formData
 
 
 # Transcrypt only
