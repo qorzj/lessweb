@@ -20,7 +20,7 @@ from lessweb.webapi import http_methods
 from lessweb.context import Context
 from lessweb.model import fetch_param, ModelToDict
 from lessweb.storage import Storage
-from lessweb.utils import eafp, re_standardize
+from lessweb.utils import eafp, re_standardize, makedir
 from lessweb.bridge import Bridge, assert_valid_bridge
 from lessweb.garage import Jsonizable, BaseBridge, JsonToJson
 
@@ -429,7 +429,7 @@ class Application(object):
     def test_put(self, localpart='/', data=None, headers=None, status_code=200, parsejson=True, https=False, env=None):
         return self._reqtest(localpart, 'PUT', data, headers, status_code, parsejson, https, env)
 
-    def run(self, wsgifunc=None, port:int=8080, homepath=''):
+    def run(self, wsgifunc=None, port:int=8080, homepath='', staticpath='static'):
         """
         Example:
 
@@ -450,5 +450,8 @@ class Application(object):
         if homepath and homepath[0] != '/':
             homepath = '/' + homepath
 
+        if staticpath is not None:
+            makedir('static')
+            app.router.add_static(prefix='/static/', path=staticpath)
         app.router.add_route("*", homepath + "/{path_info:.*}", WSGIHandler(wsgifunc))
         web.run_app(app, port=port)

@@ -85,7 +85,7 @@ def init(*, protocol=None, username=None, password=None, host=None, port:int=Non
 def processor(ctx: Context):
     db = global_data.db_session_maker()
     try:
-        ctx.set_param(DatabaseKey.db, db)
+        ctx.set_param(DatabaseKey.session, db)
         if global_data.autocommit:
             with db.begin():
                 return ctx()
@@ -136,19 +136,18 @@ def cast_model(modelCls: Type[T], tblObjs) -> T:
     if tblObjs is None:
         return None
 
-    if not isinstance(tblObjs, Iterable):  # 单个对象
-        for key, value in tblObjs.__dict__.items():
+    if hasattr(tblObjs, '__table__'):  # 单个对象
+        for key in tblObjs.__table__.columns.keys():
             if key in modelKeys:
-                setattr(modelObj, key, value)
+                setattr(modelObj, key, getattr(tblObjs, key))
         return modelObj
     elif hasattr(tblObjs, 'keys'):  # sqlalchemy.util._collections.result
         for rowkey in tblObjs.keys():
             rowVal = getattr(tblObjs, rowkey)
-            # if rowkey.startswith('Tbl'):
-            if isinstance(rowVal, DbModel):  # DbModel
-                for key, value in rowVal.__dict__.items():
+            if hasattr(rowVal, '__table__'):  # DbModel
+                for key in rowVal.__table__.columns.keys():
                     if key in modelKeys:
-                        setattr(modelObj, key, value)
+                        setattr(modelObj, key, getattr(rowVal, key))
             else:  # 普通对象
                 setattr(modelObj, rowkey, rowVal)
 

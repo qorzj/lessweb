@@ -3,7 +3,34 @@ Dom Element
 """
 # __pragma__ ('skip')
 import json
+import os
+
+
+def buildjs(srcpath, distpath='static/js'):
+    """
+    example:
+        import os
+        os.system('mkdir -p static/js')
+        buildjs('pages')
+    """
+    pagenames = [fname.rsplit('.')[0] for fname in os.listdir(srcpath) if fname.endswith('.py')]
+    for pagename in pagenames:
+        pyname = f'{srcpath}/{pagename}.py'
+        jsname = f'{distpath}/{pagename}.js'
+        if not os.path.isfile(jsname) or os.path.getmtime(jsname) < os.path.getmtime(pyname):
+            cmd = f'transcrypt -b -k -n {srcpath}/{pagename} && mv {srcpath}/__target__/*.js {distpath}'
+            os.system(cmd)
+
 # __pragma__ ('noskip')
+
+
+def tofixed(num, *, precision) -> str:
+    # __pragma__ ('skip')
+    if ...:
+        fmt = f'%.{precision}f'
+        return fmt % num
+    # __pragma__ ('noskip')
+    return num.toFixed(precision)
 
 
 def uncapitalize_name(name):
@@ -183,7 +210,7 @@ def Link(text, *, Url, Id=None):
     return Div(text, Tag='a', Href=Url, Id=Id)
 
 
-def Module(From:str, Import:str, As:str, Path='/__target__'):
+def Module(From:str, Import:str, As:str, Path='/static/js'):
     """
     example: Module(From='home', Import='Action()', AS='home_action')
     """
@@ -209,6 +236,17 @@ class Kit:
         if onsuccess is not None: kw['success'] = onsuccess
         if onerror is not None: kw['error'] = onerror
         Zepto.ajax(kw)
+
+    @staticmethod
+    def request(*, method, url, json: bool, form: bool, data=None, headers=None, onsuccess=None, onerror=None):
+        contentType = False
+        if json:
+            data = Kit.stringifyJSON(data)
+            contentType = 'application/json'
+        elif not form:
+            data = Kit.param(data)
+        Kit.ajax(method=method, url=url, data=data, headers=headers,
+                 contentType=contentType, processData=False, onsuccess=onsuccess, onerror=onerror)
 
     @staticmethod
     def get_json(url, data, onsuccess):
@@ -264,8 +302,8 @@ class Kit:
             weui.alert(text, ondone)
 
     @staticmethod
-    def reload(url):
-        location.reload(url)
+    def reload():
+        location.reload()
 
     @staticmethod
     def goto(url):
@@ -273,6 +311,10 @@ class Kit:
 
     @staticmethod
     def form_data(*selectors):
+        """
+        form = Kit.form_data('#ia', '#ib')
+        form.append('key', value)
+        """
         formData = eval('new FormData()')
         for selector in selectors:
             div = Kit.select(selector)

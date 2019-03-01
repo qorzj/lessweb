@@ -130,3 +130,7 @@ def func_arg_spec(fn)->Dict[str, Tuple[Type, bool]]:
     for name in inspect_ret.kwonlyargs:
         arg_spec[name] = (annotations.get(name, Any), True)
     return arg_spec
+
+
+def makedir(real_path):
+    Path(real_path).mkdir(parents=True, exist_ok=True)
