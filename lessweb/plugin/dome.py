@@ -152,7 +152,7 @@ def Button(text, *, Onclick:str, primary=False, warn=False, Id=None):
     )
 
 
-def TextInput(title, *, Id, Name=None, Value=''):
+def TextInput(title, *, Id, Name=None, Value=None, Type='text'):
     return Div(
         Div(
             title,
@@ -160,7 +160,7 @@ def TextInput(title, *, Id, Name=None, Value=''):
         ), Div(
             Div(
                 Div(
-                    Div(Tag='input', Id=Id, Class='weui-input', Type='text', Name=Name, Value=Value, Placeholder=''),
+                    Div(Tag='input', Id=Id, Class='weui-input', Type=Type, Name=Name, Value=Value, Placeholder=''),
                     Class='weui-cell__bd'
                 ),
                 Class='weui-cell',
@@ -186,6 +186,34 @@ def FileInput(title, *, Id, Name=None):
             Class='weui-cells',
         )
     )
+
+
+def SelectInput(title, *options, Id, Name=None, Value=None, Onchange=None):
+    """
+    e.g. SelectInput(
+            'title', SelectOption('UP', Value=1), SelectOption('DOWN', Value=2),
+            Id='...', Value=2, Onchange='check(this.value)'
+        )
+    """
+    return Div(
+        Div(
+            title,
+            Tag='label', Class='weui-cells__title', For=Id,
+        ), Div(
+            Div(
+                Div(
+                    *options,
+                    Tag='select', Name=Name, Class='weui-select', Value=Value, Onchange=Onchange,
+                ),
+                Class='weui-cell__bd',
+            ),
+            Class='weui-cell weui-cell_select weui-cell_select-after',
+        )
+    )
+
+
+def SelectOption(text, *, Value):
+    return Div(text, Value=Value)
 
 
 def TextArea(title, *, Id, Name=None, Rows:int=3):
@@ -238,12 +266,12 @@ class Kit:
         Zepto.ajax(kw)
 
     @staticmethod
-    def request(*, method, url, json: bool, form: bool, data=None, headers=None, onsuccess=None, onerror=None):
+    def request(*, method, url, data=None, headers=None, json=False, onsuccess=None, onerror=None):
         contentType = False
         if json:
             data = Kit.stringifyJSON(data)
             contentType = 'application/json'
-        elif not form:
+        elif isinstance(data, dict):
             data = Kit.param(data)
         Kit.ajax(method=method, url=url, data=data, headers=headers,
                  contentType=contentType, processData=False, onsuccess=onsuccess, onerror=onerror)
