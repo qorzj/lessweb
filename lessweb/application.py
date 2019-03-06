@@ -165,7 +165,7 @@ class Application(object):
                         else:
                             ctx.querynames = mapping.querynames
                         return mapping.dealer
-                    else:
+                    elif mapping.method != 'OPTIONS':
                         supported_methods.append(mapping.method)
             # end: for
             raise NotFoundError(methods=supported_methods)

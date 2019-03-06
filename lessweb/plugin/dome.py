@@ -9,10 +9,9 @@ import os
 def buildjs(srcpath, distpath='static/js'):
     """
     example:
-        import os
-        os.system('mkdir -p static/js')
         buildjs('pages')
     """
+    os.system(f'mkdir -p {distpath}')
     pagenames = [fname.rsplit('.')[0] for fname in os.listdir(srcpath) if fname.endswith('.py')]
     for pagename in pagenames:
         pyname = f'{srcpath}/{pagename}.py'
@@ -328,6 +327,12 @@ class Kit:
             weui.alert(text)
         else:
             weui.alert(text, ondone)
+
+    @staticmethod
+    def confirm(text, onconfirm=None, oncancel=None):
+        if onconfirm is None and oncancel is not None:
+            onconfirm = lambda: None
+        weui.confirm(text, onconfirm, oncancel)
 
     @staticmethod
     def reload():
