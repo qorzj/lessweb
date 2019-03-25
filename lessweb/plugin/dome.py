@@ -63,10 +63,10 @@ class Div:
     def _dump_head(self):
         sb = [self.tag]
         for key, value in self.attrs.items():
-            if value is not None:
-                sb.append(' {}={}'.format(uncapitalize_name(key), repr(value)))
-            elif value is True:
+            if value is True:
                 sb.append(' {}'.format(uncapitalize_name(key)))
+            elif value is not None and value is not False:
+                sb.append(' {}={}'.format(uncapitalize_name(key), repr(value)))
         return ''.join(sb)
 
     def dumps(self):
@@ -156,13 +156,13 @@ def TextInput(title, *, Id, Name=None, Value=None, Type='text'):
         Div(
             title,
             Tag='label', Class='weui-cells__title', For=Id,
-        ), Div(
+        ) if title else '', Div(
             Div(
                 Div(
                     Div(Tag='input', Id=Id, Class='weui-input', Type=Type, Name=Name, Value=Value, Placeholder=''),
                     Class='weui-cell__bd'
                 ),
-                Class='weui-cell',
+                Class='weui-cell', Style=('padding: 0px' if Type=='hidden' else None)
             ),
             Class='weui-cells',
         )
@@ -202,7 +202,7 @@ def SelectInput(title, *options, Id, Name=None, Value=None, Onchange=None):
             Div(
                 Div(
                     *options,
-                    Tag='select', Name=Name, Class='weui-select', Value=Value, Onchange=Onchange,
+                    Tag='select', Id=Id, Name=Name, Class='weui-select', Onchange=Onchange,
                 ),
                 Class='weui-cell__bd',
             ),
@@ -211,8 +211,8 @@ def SelectInput(title, *options, Id, Name=None, Value=None, Onchange=None):
     )
 
 
-def SelectOption(text, *, Value):
-    return Div(text, Value=Value)
+def SelectOption(text, *, Value, selected=False):
+    return Div(text, Value=Value, Selected=selected, Tag='option')
 
 
 def TextArea(title, *, Id, Name=None, Rows:int=3):
