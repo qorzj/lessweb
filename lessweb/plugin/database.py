@@ -1,6 +1,7 @@
-from typing import Any, overload, Type, TypeVar, get_type_hints, Iterable, List
+from typing import Any, overload, Type, TypeVar, get_type_hints, Iterable, List, Iterator
 from urllib.parse import quote
 from enum import Enum
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -111,19 +112,16 @@ def create_all(*DbModelClass):
         db_class.metadata.create_all(global_data.db_engine)
 
 
-class make_session:
-    session: Session
-
-    def __init__(self):
-        self.session = global_data.db_session_maker()
-
-    def __enter__(self) -> Session:
-        return self.session
-
-    def __exit__(self, type_, value, traceback):
-        self.session.rollback()
-        self.session.close()
-        raise value
+@contextmanager
+def make_session() -> Iterator[Session]:
+    session: Session = global_data.db_session_maker()
+    try:
+        yield session
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
 
 
 T = TypeVar('T')

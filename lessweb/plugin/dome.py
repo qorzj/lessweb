@@ -100,7 +100,7 @@ def HtmlPage(*nodes, title='Welcome', https=False):
             Div(title, Tag='title'),
             Div(Tag='link', Href=f'{protocol}://res.wx.qq.com/open/libs/weui/1.1.2/weui.min.css', Rel='stylesheet', Type='text/css'),
             Div('', Tag='script', Src=f'{protocol}://cdn.bootcss.com/zepto/1.2.0/zepto.min.js'),
-            Div('', Tag='script', Src='https://res.wx.qq.com/open/libs/weuijs/1.1.3/weui.min.js'),
+            Div('', Tag='script', Src=f'{protocol}://res.wx.qq.com/open/libs/weuijs/1.1.3/weui.min.js'),
             Div("""
                 body {
                     position: relative;

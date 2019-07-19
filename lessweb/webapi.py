@@ -91,7 +91,7 @@ class Cookie:
 
     def dumps(self):
         morsel = Morsel()
-        morsel.set(self.name, self.value, quote(self.value))
+        morsel.set(self.name, self.value, self.value)
         morsel['expires'] = '' if self.expires is None else self.expires
         morsel['path'] = self.path
         if self.domain: morsel['domain'] = self.domain
@@ -113,7 +113,7 @@ def parse_cookie(http_cookie)->Dict[str, str]:
                 cookie.load(attr_value)
             except CookieError:
                 pass
-    cookies = dict([(k, unquote(v.value)) for k, v in cookie.items()])
+    cookies = dict([(k, v.value) for k, v in cookie.items()])
     return cookies
 
 

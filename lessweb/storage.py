@@ -49,10 +49,10 @@ class Storage(dict):
         return self
 
     @staticmethod
-    def of(object):
+    def of(obj):
         result = Storage()
-        for name in get_type_hints(object).keys():
-            result[name] = getattr(object, name)
+        for name in get_type_hints(obj).keys():
+            result[name] = getattr(obj, name)
         return result
 
 
