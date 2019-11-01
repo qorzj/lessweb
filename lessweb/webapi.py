@@ -162,7 +162,8 @@ def header_name_of_wsgi_key(wsgi_key):
 
     """
     if wsgi_key.startswith('HTTP_'):
-        return '-'.join(s.capitalize() for s in wsgi_key[5:].split('_'))
+        words_for_short = {'IM', 'HTTP2', 'MD5', 'TE', 'DNT', 'ATT', 'UIDH', 'XSS'}
+        return '-'.join((s if s in words_for_short else s.capitalize()) for s in wsgi_key[5:].split('_'))
     else:
         return ''
 
