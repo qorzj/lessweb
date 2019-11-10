@@ -16,7 +16,7 @@ class SlowTest(TestCase):
             if filename.startswith('test_'):
                 self.assertNotEqual(0, system(f"cd tests/typeunsafe && mypy {filename}"))
 
-        print("system test")
+        self.assertEqual(0, system("cd tests/systest && nosetests -s *"))
 
     def tearDown(self):
         system("pip uninstall -y -q lessweb")

@@ -1,13 +1,40 @@
 # 存放与类型转换有关的类型定义，且不依赖同级其他库
-from typing import Type, TypeVar, get_type_hints, Any, Tuple, List, Callable, Union
+from enum import Enum
+from typing import Type, TypeVar, get_type_hints, Any, Tuple, List, Callable, Union, Dict
 from abc import abstractmethod, ABCMeta
 from .typehint import issubtyping
 from .utils import func_arg_spec
-from .webapi import Jsonizable, ParamStr
 
 
 class uint(int):
     pass
+
+
+Jsonizable = Union[str, int, float, Dict, List, None]
+
+
+class ParamSource(Enum):
+    Url = 1
+    Query = 2
+    Form = 3
+
+
+class ParamStr:
+    value: str
+    source: ParamSource
+
+    def __init__(self, value: str, source: ParamSource):
+        self.value = value
+        self.source = source
+
+
+class MultipartFile:
+    filename: str
+    value: bytes
+
+    def __init__(self, upfile):
+        self.filename = upfile.filename
+        self.value = upfile.value
 
 
 class RequestBridge:

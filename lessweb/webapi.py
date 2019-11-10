@@ -1,13 +1,11 @@
-from typing import Optional, Dict, List, Union
+from typing import Optional, Dict, List
 import cgi
 from io import BytesIO
 from http.cookies import Morsel, SimpleCookie, CookieError
 from urllib.parse import parse_qs, unquote
 from enum import Enum
 from typing import NamedTuple
-
-
-Jsonizable = Union[str, int, float, Dict, List, None]
+from .bridge import ParamSource, ParamStr, MultipartFile
 
 
 mimetypes = {
@@ -28,30 +26,6 @@ hop_by_hop_headers = (
 http_methods = (
     'GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH',
 )
-
-
-class ParamSource(Enum):
-    Url = 1
-    Query = 2
-    Form = 3
-
-
-class ParamStr:
-    value: str
-    source: ParamSource
-
-    def __init__(self, value: str, source: ParamSource):
-        self.value = value
-        self.source = source
-
-
-class MultipartFile:
-    filename: str
-    value: bytes
-
-    def __init__(self, upfile):
-        self.filename = upfile.filename
-        self.value = upfile.value
 
 
 class ParamInput:

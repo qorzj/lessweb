@@ -2,7 +2,8 @@ from typing import Callable, Optional, Type, get_type_hints, TypeVar, Generic
 from abc import ABCMeta
 
 from .context import Context, Request, Response
-from .webapi import NeedParamError, BadParamError, MultipartFile, Jsonizable
+from .webapi import NeedParamError, BadParamError
+from .bridge import Jsonizable, MultipartFile
 from .typehint import generic_origin
 from .utils import func_arg_spec
 from .storage import Storage

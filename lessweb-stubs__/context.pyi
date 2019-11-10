@@ -6,7 +6,8 @@ from io import BytesIO
 from requests.structures import CaseInsensitiveDict
 
 from lessweb.storage import Storage
-from lessweb.webapi import MultipartFile, Cookie, HttpStatus
+from lessweb.webapi import Cookie, HttpStatus
+from lessweb import MultipartFile
 from lessweb.webapi import header_name_of_wsgi_key, wsgi_key_of_header_name
 from lessweb.webapi import parse_cookie, mimetypes
 from lessweb.utils import fields_in_query

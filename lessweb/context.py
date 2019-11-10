@@ -7,7 +7,8 @@ from io import BytesIO
 from requests.structures import CaseInsensitiveDict
 
 from .storage import Storage
-from .webapi import MultipartFile, Cookie, HttpStatus, ResponseStatus, ParamInput, ParamStr, Jsonizable
+from .webapi import Cookie, HttpStatus, ResponseStatus, ParamInput
+from .bridge import Jsonizable, ParamStr, MultipartFile
 from .webapi import header_name_of_wsgi_key, wsgi_key_of_header_name
 from .webapi import parse_cookie, mimetypes
 from .utils import eafp
@@ -85,7 +86,7 @@ class Request:
         self.method = env.get('REQUEST_METHOD')
         self.path = env.get('PATH_INFO')
         self.query = env.get('QUERY_STRING')
-        self.fullpath = self.home + env.get('REQUEST_URI')
+        self.fullpath = self.homedomain + env.get('REQUEST_URI')
         # init cookie
         if not self._cookies and self.contains_header('cookie'):
             self._cookies = parse_cookie(self.get_header('cookie'))
