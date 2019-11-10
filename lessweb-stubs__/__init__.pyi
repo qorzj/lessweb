@@ -34,8 +34,10 @@ from .typehint import (
     issubtyping as issubtyping,
     AnySub as AnySub,
 )
-from .garage import (
+from .types import (
     Jsonizable as Jsonizable,
+    ParamStr as ParamStr,
+    ParamSource as ParamSource
 )
 from .webapi import (
     NeedParamError as NeedParamError,

@@ -1,8 +1,13 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Union
+import cgi
+from io import BytesIO
 from http.cookies import Morsel, SimpleCookie, CookieError
-from urllib.parse import unquote, quote
+from urllib.parse import parse_qs, unquote
 from enum import Enum
 from typing import NamedTuple
+
+
+Jsonizable = Union[str, int, float, Dict, List, None]
 
 
 mimetypes = {
@@ -25,7 +30,22 @@ http_methods = (
 )
 
 
-class UploadedFile:
+class ParamSource(Enum):
+    Url = 1
+    Query = 2
+    Form = 3
+
+
+class ParamStr:
+    value: str
+    source: ParamSource
+
+    def __init__(self, value: str, source: ParamSource):
+        self.value = value
+        self.source = source
+
+
+class MultipartFile:
     filename: str
     value: bytes
 
@@ -34,11 +54,44 @@ class UploadedFile:
         self.value = upfile.value
 
 
-class HttpStatus(Enum):
-    class Status(NamedTuple):
-        code: int
-        reason: str
+class ParamInput:
+    def __init__(self):
+        self.url_input: Dict[str, List[ParamStr]] = {}  # Input from URL
+        self.query_input: Dict[str, List[ParamStr]] = {}  # Input from Query
+        self.form_input: Dict[str, List[ParamStr]] = {}  # Input from Form
 
+    def load_query(self, query: str, encoding: str) -> None:
+        if query and query[0] == '?':
+            query = query[1:]
+        parse_ret = parse_qs(query, keep_blank_values=True, encoding=encoding)
+        for key, vals in parse_ret.items():
+            self.query_input.setdefault(key, [])
+            self.query_input[key].extend(ParamStr(val, ParamSource.Query) for val in vals)
+
+    def load_form(self, body: bytes, env: Dict, encoding: str, file_input: Dict[str, List[MultipartFile]]) -> None:
+        parse_ret = cgi.FieldStorage(fp=BytesIO(body), environ=env.copy(), keep_blank_values=1, encoding=encoding)
+        if parse_ret.list is None: # hack to make input work with enctype='text/plain.
+            parse_ret.list = []
+        for key in parse_ret.keys():
+            for item in parse_ret[key]:
+                if item.filename is None:  # 非文件
+                    self.form_input.setdefault(key, [])
+                    self.form_input[key].append(ParamStr(item.value, ParamSource.Form))
+                else:  # 文件
+                    file_input.setdefault(key, [])
+                    file_input[key].append(MultipartFile(item))
+
+    def load_url(self, groupdict: Dict, encoding: str) -> None:
+        for key, val in groupdict.items():
+            self.url_input[key] = [ParamStr(unquote(val, encoding=encoding), ParamSource.Url)]
+
+
+class ResponseStatus(NamedTuple):
+    code: int
+    reason: str
+
+
+class HttpStatus(Enum):
     @staticmethod
     def of(code: int) -> 'HttpStatus':
         for status in HttpStatus:
@@ -46,28 +99,28 @@ class HttpStatus(Enum):
                 return status
         raise NotImplementedError(f'HTTP status {code} is not implemented.')
 
-    OK = Status(code=200, reason='OK')
-    Created = Status(code=201, reason='Created')
-    Accepted = Status(code=202, reason='Accepted')
-    NoContent = Status(code=204, reason='No Content')
-    MovedPermanently = Status(code=301, reason='Moved Permanently')
-    Found = Status(code=302, reason='Found')
-    SeeOther = Status(code=303, reason='See Other')
-    NotModified = Status(code=304, reason='Not Modified')
-    TemporaryRedirect = Status(code=307, reason='Temporary Redirect')
-    BadRequest = Status(code=400, reason='Bad Request')
-    Unauthorized = Status(code=401, reason='Unauthorized')
-    Forbidden = Status(code=403, reason='Forbidden')
-    NotFound = Status(code=404, reason='Not Found')
-    MethodNotAllowed = Status(code=405, reason='Method Not Allowed')
-    NotAcceptable = Status(code=406, reason='Not Acceptable')
-    Conflict = Status(code=409, reason='Conflict')
-    Gone = Status(code=410, reason='Gone')
-    PreconditionFailed = Status(code=412, reason='Precondition Failed')
-    UnsupportedMediaType = Status(code=415, reason='Unsupported Media Type')
-    UnprocessableEntity = Status(code=422, reason='Unprocessable Entity')
-    UnavailableForLegalReasons = Status(code=451, reason='Unavailable For Legal Reasons')
-    InternalServerError = Status(code=500, reason='Internal Server Error')
+    OK = ResponseStatus(code=200, reason='OK')
+    Created = ResponseStatus(code=201, reason='Created')
+    Accepted = ResponseStatus(code=202, reason='Accepted')
+    NoContent = ResponseStatus(code=204, reason='No Content')
+    MovedPermanently = ResponseStatus(code=301, reason='Moved Permanently')
+    Found = ResponseStatus(code=302, reason='Found')
+    SeeOther = ResponseStatus(code=303, reason='See Other')
+    NotModified = ResponseStatus(code=304, reason='Not Modified')
+    TemporaryRedirect = ResponseStatus(code=307, reason='Temporary Redirect')
+    BadRequest = ResponseStatus(code=400, reason='Bad Request')
+    Unauthorized = ResponseStatus(code=401, reason='Unauthorized')
+    Forbidden = ResponseStatus(code=403, reason='Forbidden')
+    NotFound = ResponseStatus(code=404, reason='Not Found')
+    MethodNotAllowed = ResponseStatus(code=405, reason='Method Not Allowed')
+    NotAcceptable = ResponseStatus(code=406, reason='Not Acceptable')
+    Conflict = ResponseStatus(code=409, reason='Conflict')
+    Gone = ResponseStatus(code=410, reason='Gone')
+    PreconditionFailed = ResponseStatus(code=412, reason='Precondition Failed')
+    UnsupportedMediaType = ResponseStatus(code=415, reason='Unsupported Media Type')
+    UnprocessableEntity = ResponseStatus(code=422, reason='Unprocessable Entity')
+    UnavailableForLegalReasons = ResponseStatus(code=451, reason='Unavailable For Legal Reasons')
+    InternalServerError = ResponseStatus(code=500, reason='Internal Server Error')
 
 
 class Cookie:

@@ -15,14 +15,13 @@ from urllib.parse import splitquery, urlencode
 from io import BytesIO
 from contextlib import contextmanager
 
-from lessweb.webapi import NeedParamError, BadParamError, NotFoundError, HttpStatus
-from lessweb.webapi import http_methods
-from lessweb.context import Context
-from lessweb.model import fetch_param, ModelToDict
-from lessweb.storage import Storage
-from lessweb.utils import eafp, re_standardize, makedir
-from lessweb.bridge import Bridge, assert_valid_bridge
-from lessweb.garage import Jsonizable, BaseBridge, JsonToJson
+from .webapi import NeedParamError, BadParamError, NotFoundError, HttpStatus
+from .webapi import http_methods
+from .context import Context
+from .model import fetch_param
+from .storage import Storage
+from .utils import eafp, re_standardize, makedir
+from .bridge import RequestBridge
 
 
 __all__ = [
@@ -43,14 +42,12 @@ class Interceptor:
 # Application.mapping: List[Mapping]
 class Mapping:
     """Mapping to定义请求处理者和path的对应关系"""
-    def __init__(self, pattern, method, dealer, doc, patternobj, view, querynames) -> None:
+    def __init__(self, pattern, method, dealer, doc, patternobj) -> None:
         self.pattern: str = pattern
         self.method: str = method
         self.dealer: Callable = dealer
         self.doc: str = doc
         self.patternobj: Any = patternobj
-        self.view = view
-        self.querynames = querynames
 
 
 def build_controller(dealer):
@@ -115,55 +112,18 @@ class Application(object):
     def __init__(self, encoding='utf-8', debug=True) -> None:
         self.mapping: List[Mapping] = []
         self.interceptors: List[Interceptor] = []
-        self.bridges: List[Bridge] = [JsonToJson, ModelToDict]
+        self.bridges: List[Callable] = []
         self.encoding: str = encoding
         self.debug: bool = debug
 
-    def _load(self, env):
-        ctx = Context(self)
-        ctx.request.env = ctx.environ = ctx.env = env
-        ctx.host = env.get('HTTP_HOST', '[unknown]')
-        if env.get('wsgi.url_scheme') in ['http', 'https']:
-            ctx.protocol = env['wsgi.url_scheme']
-        elif env.get('HTTPS', '').lower() in ['on', 'true', '1']:
-            ctx.protocol = 'https'
-        else:
-            ctx.protocol = 'http'
-        ctx.homedomain = ctx.protocol + '://' + ctx.host
-        ctx.homepath = os.environ.get('REAL_SCRIPT_NAME', env.get('SCRIPT_NAME', ''))
-        ctx.home = ctx.homedomain + ctx.homepath
-        # @@ home is changed when the request is handled to a sub-application.
-        # @@ but the real home is required for doing absolute redirects.
-        ctx.realhome = ctx.home
-        ctx.ip = env.get('REMOTE_ADDR')
-        ctx.method = env.get('REQUEST_METHOD')
-        ctx.path = env.get('PATH_INFO')
-        # http://trac.lighttpd.net/trac/ticket/406 requires:
-        if env.get('SERVER_SOFTWARE', '').startswith('lighttpd/'):
-            ctx.path = env.get('REQUEST_URI').split('?')[0][:len(ctx.homepath)]
-            # unquote explicitly for lighttpd to make ctx.path uniform across all servers.
-            from urllib.parse import unquote
-            ctx.path = unquote(ctx.path)
-
-        ctx.query = env.get('QUERY_STRING')
-        ctx.fullpath = ctx.path + '?' + ctx.query if ctx.query else ctx.path
-        return ctx
-
-    def _handle_with_dealers(self, ctx):
+    def _handle_with_dealers(self, ctx: Context):
         def _1_mapping_match():
             supported_methods = []
             for mapping in self.mapping:
-                _ = mapping.patternobj.search(ctx.path)
+                _ = mapping.patternobj.search(ctx.request.path)
                 if _:
-                    if mapping.method == ctx.method or mapping.method == '*':
-                        ctx._url_input.update(_.groupdict())
-                        ctx.view = mapping.view
-                        if mapping.querynames == '*':
-                            ctx.querynames = None
-                        elif isinstance(mapping.querynames, str):
-                            ctx.querynames = mapping.querynames.replace(',', ' ').split()
-                        else:
-                            ctx.querynames = mapping.querynames
+                    if mapping.method == ctx.request.method or mapping.method == '*':
+                        ctx.request.param_input.load_url(_.groupdict(), self.encoding)
                         return mapping.dealer
                     elif mapping.method != 'OPTIONS':
                         supported_methods.append(mapping.method)
@@ -174,7 +134,7 @@ class Application(object):
             f = build_controller(_1_mapping_match())
             if f is None: return ''
             for itr in self.interceptors:
-                if itr.patternobj.search(ctx.path) and (itr.method == ctx.method or itr.method == '*'):
+                if itr.patternobj.search(ctx.request.path) and (itr.method == ctx.request.method or itr.method == '*'):
                     f = interceptor(itr.dealer)(f)
             return f(ctx)
         except (NeedParamError, BadParamError) as e:
@@ -204,11 +164,10 @@ class Application(object):
         patternobj = re.compile(re_standardize(pattern))
         self.interceptors.insert(0, Interceptor(pattern, method, dealer, patternobj))
 
-    def add_bridge(self, bridge: Type[Bridge]):
-        assert_valid_bridge(bridge)
+    def add_bridge(self, bridge: Callable):
         self.bridges.append(bridge)
 
-    def add_mapping(self, pattern, method, dealer, view=None):
+    def add_mapping(self, pattern, method, dealer):
         """
         Example:
 
@@ -226,7 +185,7 @@ class Application(object):
         method = method.upper()
         assert method == '*' or method in http_methods, 'Method:[{}] should be one of {}'.format(method, ['*'] + http_methods)
         patternobj = re.compile(re_standardize(pattern))
-        self.mapping.append(Mapping(pattern, method, dealer, '', patternobj, view, '*'))
+        self.mapping.append(Mapping(pattern, method, dealer, '', patternobj))
 
     # add_*_interceptor / add_*_mapping are generated by code below:
     """
@@ -238,44 +197,44 @@ class Application(object):
     def add_connect_interceptor(self, pattern, dealer):
         return self.add_interceptor(pattern, 'CONNECT', dealer)
 
-    def add_connect_mapping(self, pattern, dealer, view=None):
-        return self.add_mapping(pattern, 'CONNECT', dealer, view)
+    def add_connect_mapping(self, pattern, dealer):
+        return self.add_mapping(pattern, 'CONNECT', dealer)
 
     def add_delete_interceptor(self, pattern, dealer):
         return self.add_interceptor(pattern, 'DELETE', dealer)
 
-    def add_delete_mapping(self, pattern, dealer, view=None):
-        return self.add_mapping(pattern, 'DELETE', dealer, view)
+    def add_delete_mapping(self, pattern, dealer):
+        return self.add_mapping(pattern, 'DELETE', dealer)
 
     def add_get_interceptor(self, pattern, dealer):
         return self.add_interceptor(pattern, 'GET', dealer)
 
-    def add_get_mapping(self, pattern, dealer, view=None):
-        return self.add_mapping(pattern, 'GET', dealer, view)
+    def add_get_mapping(self, pattern, dealer):
+        return self.add_mapping(pattern, 'GET', dealer)
 
     def add_head_interceptor(self, pattern, dealer):
         return self.add_interceptor(pattern, 'HEAD', dealer)
 
-    def add_head_mapping(self, pattern, dealer, view=None):
-        return self.add_mapping(pattern, 'HEAD', dealer, view)
+    def add_head_mapping(self, pattern, dealer):
+        return self.add_mapping(pattern, 'HEAD', dealer)
 
     def add_options_interceptor(self, pattern, dealer):
         return self.add_interceptor(pattern, 'OPTIONS', dealer)
 
-    def add_options_mapping(self, pattern, dealer, view=None):
-        return self.add_mapping(pattern, 'OPTIONS', dealer, view)
+    def add_options_mapping(self, pattern, dealer):
+        return self.add_mapping(pattern, 'OPTIONS', dealer)
 
     def add_post_interceptor(self, pattern, dealer):
         return self.add_interceptor(pattern, 'POST', dealer)
 
-    def add_post_mapping(self, pattern, dealer, view=None):
-        return self.add_mapping(pattern, 'POST', dealer, view)
+    def add_post_mapping(self, pattern, dealer):
+        return self.add_mapping(pattern, 'POST', dealer)
 
     def add_put_interceptor(self, pattern, dealer):
         return self.add_interceptor(pattern, 'PUT', dealer)
 
-    def add_put_mapping(self, pattern, dealer, view=None):
-        return self.add_mapping(pattern, 'PUT', dealer, view)
+    def add_put_mapping(self, pattern, dealer):
+        return self.add_mapping(pattern, 'PUT', dealer)
 
     def wsgifunc(self, *middleware):
         """
@@ -301,7 +260,8 @@ class Application(object):
                     firstchunk = ''
                 return itertools.chain([firstchunk], iterator)
 
-            ctx = self._load(env)
+            ctx = Context(self)
+            ctx.request.load(env)
             try:
                 mimekey = 'html'
                 resp = self._handle_with_dealers(ctx)
@@ -334,8 +294,9 @@ class Application(object):
                         yield str(r).encode(self.encoding)
 
             result = _2_build_result(result)
-            status = ctx.response.get_status().value
-            status_text = '{0} {1}'.format(status.code, status.reason)
+            status_wrap = ctx.response.get_status()
+            status_core = status_wrap.value if isinstance(status_wrap, HttpStatus) else status_wrap
+            status_text = f'{status_core.code} {status_core.reason}'
             headers = list(ctx.response._headers.items())
             for cookie in ctx.response._cookies.values():
                 headers.append(('Set-Cookie', cookie.dumps()))

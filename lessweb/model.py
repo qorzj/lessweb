@@ -1,20 +1,23 @@
-from typing import Callable, Optional, Type, get_type_hints
+from typing import Callable, Optional, Type, get_type_hints, TypeVar, Generic
 from abc import ABCMeta
 
-from lessweb.context import Context, Request, Response
-from lessweb.webapi import NeedParamError, BadParamError, UploadedFile
-from lessweb.typehint import generic_origin
-from lessweb.garage import BaseBridge, Bridge, Jsonizable
-from lessweb.utils import func_arg_spec
-from lessweb.storage import Storage
+from .context import Context, Request, Response
+from .webapi import NeedParamError, BadParamError, MultipartFile, Jsonizable
+from .typehint import generic_origin
+from .utils import func_arg_spec
+from .storage import Storage
+from .bridge import RequestBridge
 
 
-class Model(metaclass=ABCMeta):
-    def __eq__(self, other):
-        return Storage.of(self) == Storage.of(other)
+T = TypeVar('T')
 
-    def __repr__(self):
-        return '<Model ' + repr(Storage.of(self)) + '>'
+
+class Model(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value: T = value
+
+    def get(self) -> T:
+        return self.value
 
 
 class Service(metaclass=ABCMeta):
@@ -86,15 +89,13 @@ def fetch_param(ctx: Context, fn: Callable):
         >>> def get_person(ctx:Context, name:str, age:int, weight:int, createAt:int=2):
         ...     pass
         >>> ctx = Context()
-        >>> ctx.set_alias('weight', 'w')
+        >>> ctx.request.set_alias('weight', 'w')
         >>> ctx._fields = dict(name='Bob', age='33', w='100', weight='1', createAt='9')
         >>> param = fetch_param(ctx, get_person)
         >>> assert param == {'ctx': ctx, 'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
     """
     result = {}
-    bridge = BaseBridge()
-    bridge.init_for_cast(ctx.app.bridges)
-    fields = ctx.get_inputs()
+    bridge = RequestBridge(ctx.app.bridges)
     for realname, (realtype, has_default) in func_arg_spec(fn).items():
         if realname == 'return': continue
         if realtype == Context:
@@ -108,36 +109,16 @@ def fetch_param(ctx: Context, fn: Callable):
         elif isinstance(realtype, type) and issubclass(realtype, Model):
             result[realname] = fetch_model(ctx, realtype)
         else:
-            queryname = ctx._aliases.get(realname, realname)
-            if queryname not in fields:  # 缺输入
-                if has_default:
-                    pass  # 不赋值&不报错
-                elif generic_origin(realtype) == Optional:
-                    result[realname] = None
-                else:
-                    raise NeedParamError(query=realname, doc='Missing Required Param')
-            elif realtype == UploadedFile:
-                queryvalue = fields[queryname]
-                if not isinstance(queryvalue, UploadedFile):
-                    raise BadParamError(query=realname, error='Uploaded File Only')
-                result[realname] = queryvalue
-            else:  # 输入的类型转换
+            queryname = ctx.request._aliases.get(realname, realname)
+            inputval = ctx.request.get_input(queryname)
+            if inputval is not None:
                 try:
-                    queryvalue = fields[queryname]
-                    result[realname] = bridge.cast(queryvalue, type(queryvalue), realtype)
+                    result[realname] = bridge.cast(inputval, realtype)
                 except (ValueError, TypeError) as e:
                     raise BadParamError(query=realname, error=str(e))
+            elif not has_default:
+                raise NeedParamError(query=realname, doc='Missing Required Param')
+            else:
+                pass  # 不赋值&不报错
+
     return result
-
-
-class ModelToDict(Bridge):
-    def __init__(self, source: Model):
-        self.value = source
-
-    def to(self) -> Jsonizable:
-        ret = {}
-        for name, type_ in get_type_hints(type(self.value)).items():
-            if hasattr(self.value, name) and name[0] != '_':
-                value = self.cast(getattr(self.value, name), type_, Jsonizable)
-                ret[name] = value
-        return ret

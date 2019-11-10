@@ -59,68 +59,7 @@ def re_standardize(pattern):
     return re.sub(r'\{([^0-9].*?)\}', _repl, pattern)
 
 
-def fields_in_query(query):
-    """
-        >>> fields_in_query('a=1&b=2')
-        {'a': '1', 'b': '2'}
-
-        >>> fields_in_query('')
-        {}
-
-        >>> fields_in_query('?')
-        {}
-
-    """
-    ret = {}
-    if query and query[0] == '?':
-        query = query[1:]
-    if not query:
-        return ret
-    for seg in query.split('&'):
-        k, v = seg.split('=', 1)
-        ret[k] = v
-    return ret
-
-
-class StaticDict(dict):
-    touched = False
-
-    def __delitem__(self, key):
-        super().__delitem__(key)
-        self.touched = True
-
-    def __setitem__(self, key, value):
-        super().__setitem__(key, value)
-        self.touched = True
-
-    def update(self, *E, **F):
-        super().update(*E, **F)
-        self.touched = True
-
-    def pop(self, *k):
-        ret = super().pop(*k)
-        self.touched = True
-        return ret
-
-
-@contextmanager
-def static_dict(path):
-    is_json = path.lower().endswith('.json')
-    path = Path(path)
-    if is_json:
-        data = StaticDict(json.load(path.open('r'))) if path.exists() else StaticDict()
-    else:
-        data = StaticDict(pickle.load(path.open('rb'))) if path.exists() else StaticDict()
-    yield data
-    if data.touched:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if is_json:
-            json.dump(data, path.open('w'))
-        else:
-            pickle.dump(data, path.open('wb'))
-
-
-def func_arg_spec(fn)->Dict[str, Tuple[Type, bool]]:
+def func_arg_spec(fn) -> Dict[str, Tuple[Type, bool]]:
     arg_spec = {}  # name: (type_, has_default)
     inspect_ret = inspect.getfullargspec(fn)
     annotations = get_type_hints(fn)

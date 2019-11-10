@@ -1,53 +1,131 @@
-from typing import Optional, Dict, List, Union
+from typing import Any, Optional, Dict, List, Union, TYPE_CHECKING
 import cgi
 import json
+import os
 
 from io import BytesIO
 from requests.structures import CaseInsensitiveDict
 
-from lessweb.storage import Storage
-from lessweb.webapi import UploadedFile, Cookie, HttpStatus
-from lessweb.webapi import header_name_of_wsgi_key, wsgi_key_of_header_name
-from lessweb.webapi import parse_cookie, mimetypes
-from lessweb.utils import fields_in_query
-from lessweb.garage import Jsonizable
+from .storage import Storage
+from .webapi import MultipartFile, Cookie, HttpStatus, ResponseStatus, ParamInput, ParamStr, Jsonizable
+from .webapi import header_name_of_wsgi_key, wsgi_key_of_header_name
+from .webapi import parse_cookie, mimetypes
+from .utils import eafp
 
-
-def _process_fieldstorage(fs):
-    if isinstance(fs, list):
-        return _process_fieldstorage(fs[0])  # 递归计算
-    elif fs.filename is None:  # 非文件参数
-        return fs.value
-    else:  # 文件参数
-        return UploadedFile(fs)
-
-
-def _dictify(fs):
-    # hack to make input work with enctype='text/plain.
-    if fs.list is None:
-        fs.list = []
-    return dict([(k, _process_fieldstorage(fs[k])) for k in fs.keys()])
+if TYPE_CHECKING:
+    from lessweb.application import Application
 
 
 class Request:
-    def __init__(self):
-        self.env: Dict = {}
-        self._cookies: Dict[str, str] = {}
+    """
+    Contextual variables:
+        * environ a.k.a. env – a dictionary containing the standard WSGI environment variables
+        * home – the base path for the application, including any parts "consumed" by outer applications
+        * homedomain – ? (appears to be protocol + host)
+        * homepath – The part of the path requested by the user which was trimmed off the current app. That is homepath + path = the path actually requested in HTTP by the user. E.g. /admin This seems to be derived during startup from the environment variable REAL_SCRIPT_NAME. It affects what web.url() will prepend to supplied urls. This in turn affects where web.seeother() will go, which might interact badly with your url rewriting scheme (e.g. mod_rewrite)
+        * host – the hostname (domain) and (if not default) the port requested by the user. E.g. example.org, example.org:8080
+        * ip – the IP address of the user. E.g. xxx.xxx.xxx.xxx
+        * method – the HTTP method used. E.g. POST
+        * path – the path requested by the user, relative to the current application. If you are using subapplications, any part of the url matched by the outer application will be trimmed off. E.g. you have a main app in code.py, and a subapplication called admin.py. In code.py, you point /admin to admin.app. In admin.py, you point /stories to a class called stories. Within stories, web.ctx.path will be /stories, not /admin/stories.
+        * protocol – the protocol used. E.g. https
+        * query – an empty string if there are no query arguments otherwise a ? followed by the query string.
+        * fullpath a.k.a. path + query – the path requested including query arguments but not including homepath.
 
-    def _init_cookies(self):
+        e.g. GET http://localhost:8080/api/hello/echo?a=1&b=2
+            host => localhost:8080
+            protocol => http
+            homedomain => http://localhost:8080
+            homepath => /api
+            home => http://localhost:8080/api
+            ip => 127.0.0.1
+            method => GET
+            path => /hello/echo
+            query => a=1&b=2
+            fullpath => /hello/echo?a=1&b=2
+
+        lessweb use ctx.path in routing.
+    """
+    def __init__(self, encoding: str):
+        self._cookies: Dict[str, str] = {}
+        self._aliases: Dict[str, str] = {}  # alias {realname: queryname}
+        self._pipe: Dict[str, Any] = {}
+
+        self.encoding: str = encoding
+        self.environ: Dict = {}
+        self.env: Dict = {}
+        self.host: str = ''
+        self.protocol: str = ''
+        self.homedomain: str = ''
+        self.homepath: str = ''
+        self.home: str = ''
+        self.ip: str = ''
+        self.method: str = ''
+        self.path: str = ''
+        self.query: str = ''
+        self.fullpath: str = ''
+
+        self.body_data: Optional[bytes] = None  # Raw Body Input
+        self.json_input: Optional[Dict] = None  # Input from Json Body
+        self.param_input: ParamInput = ParamInput()  # Param Inputs
+        self.file_input: Dict[str, List[MultipartFile]] = {}  # Uploaded File Inputs
+
+    def load(self, env):
+        self.environ = self.env = env
+        self.host = env.get('HTTP_HOST', '[unknown]')
+        if env.get('wsgi.url_scheme') in ['http', 'https']:
+            self.protocol = env['wsgi.url_scheme']
+        elif env.get('HTTPS', '').lower() in ['on', 'true', '1']:
+            self.protocol = 'https'
+        else:
+            self.protocol = 'http'
+        self.homedomain = self.protocol + '://' + self.host
+        self.homepath = os.environ.get('REAL_SCRIPT_NAME', env.get('SCRIPT_NAME', ''))
+        self.home = self.homedomain + self.homepath
+        self.ip = env.get('REMOTE_ADDR')
+        self.method = env.get('REQUEST_METHOD')
+        self.path = env.get('PATH_INFO')
+        self.query = env.get('QUERY_STRING')
+        self.fullpath = self.home + env.get('REQUEST_URI')
+        # init cookie
         if not self._cookies and self.contains_header('cookie'):
             self._cookies = parse_cookie(self.get_header('cookie'))
+        # parse query params
+        self.param_input.load_query(self.query, self.encoding)
+        # load body data
+        cl = eafp(lambda: int(self.env.get('CONTENT_LENGTH')), 0)
+        self.body_data = self.env['wsgi.input'].read(cl) if cl else None
+        # parse form params
+        if self.body_data:
+            if self.is_json():
+                self.json_input = eafp(lambda: json.loads(self.body_data.decode(self.encoding)),
+                                       {'__error__': 'invalid json received'})
+            elif self.is_form():
+                eafp(lambda: self.param_input.load_form(self.body_data, self.env, self.encoding, self.file_input), None)
+
+
+    def set_alias(self, realname, queryname):
+        self._aliases[realname] = queryname
+
+    def set_param(self, realname, realvalue):
+        self._pipe[realname] = realvalue
+
+    def get_param(self, realname, default=None):
+        return self._pipe.get(realname, default)
+
+    def is_json(self):
+        return 'json' in self.env.get('CONTENT_TYPE', '').lower()
+
+    def is_form(self):
+        content_type = self.env.get('CONTENT_TYPE', '').lower()
+        return not content_type or 'form-' in content_type or '-urlencoded' in content_type
 
     def contains_cookie(self, name: str) -> bool:
-        self._init_cookies()
         return name in self._cookies
 
     def get_cookie(self, name: str) -> Optional[str]:
-        self._init_cookies()
         return self._cookies.get(name)
 
     def get_cookienames(self) -> List[str]:
-        self._init_cookies()
         return list(self._cookies.keys())
 
     def contains_header(self, name: str) -> bool:
@@ -62,12 +140,26 @@ class Request:
     def get_headernames(self) -> List[str]:
         return [s for s in (header_name_of_wsgi_key(k) for k in self.env.keys()) if s]
 
+    def get_input(self, key: str) -> Optional[Union[ParamStr, Jsonizable]]:
+        param = self.param_input
+        if key in param.url_input:
+            return param.url_input[key][0]
+        elif key in param.query_input:
+            return param.query_input[key][0]
+        elif key in param.form_input:
+            return param.form_input[key][0]
+        elif isinstance(self.json_input, dict):
+            return self.json_input.get(key, None)
+        else:
+            return None
+
 
 class Response:
-    def __init__(self):
+    def __init__(self, encoding: str):
         self._cookies: Dict[str, Cookie] = {}
-        self._status: HttpStatus = HttpStatus.OK
+        self._status: Union[HttpStatus, ResponseStatus] = HttpStatus.OK
         self._headers = CaseInsensitiveDict()
+        self.encoding: str = encoding
 
     def set_cookie(self, name:str, value:str, expires:int=None, path:str='/',
                    domain:str=None, secure:bool=False, httponly:bool=False) -> None:
@@ -79,10 +171,10 @@ class Response:
     def del_cookie(self, name:str) -> None:
         self._cookies.pop(name, None)
 
-    def set_status(self, status: HttpStatus) -> None:
+    def set_status(self, status: Union[HttpStatus, ResponseStatus]) -> None:
         self._status = status
 
-    def get_status(self) -> HttpStatus:
+    def get_status(self) -> Union[HttpStatus, ResponseStatus]:
         return self._status
 
     def set_header(self, name: str, value: Union[str, int]) -> None:
@@ -129,122 +221,12 @@ class Response:
 
 
 class Context(object):
-    """
-    Contextual variables:
-        * environ a.k.a. env – a dictionary containing the standard WSGI environment variables
-        * home – the base path for the application, including any parts "consumed" by outer applications
-        * homedomain – ? (appears to be protocol + host)
-        * homepath – The part of the path requested by the user which was trimmed off the current app. That is homepath + path = the path actually requested in HTTP by the user. E.g. /admin This seems to be derived during startup from the environment variable REAL_SCRIPT_NAME. It affects what web.url() will prepend to supplied urls. This in turn affects where web.seeother() will go, which might interact badly with your url rewriting scheme (e.g. mod_rewrite)
-        * host – the hostname (domain) and (if not default) the port requested by the user. E.g. example.org, example.org:8080
-        * ip – the IP address of the user. E.g. xxx.xxx.xxx.xxx
-        * method – the HTTP method used. E.g. POST
-        * path – the path requested by the user, relative to the current application. If you are using subapplications, any part of the url matched by the outer application will be trimmed off. E.g. you have a main app in code.py, and a subapplication called admin.py. In code.py, you point /admin to admin.app. In admin.py, you point /stories to a class called stories. Within stories, web.ctx.path will be /stories, not /admin/stories.
-        * protocol – the protocol used. E.g. https
-        * query – an empty string if there are no query arguments otherwise a ? followed by the query string.
-        * fullpath a.k.a. path + query – the path requested including query arguments but not including homepath.
-
-        e.g. GET http://localhost:8080/api/hello/echo?a=1&b=2
-            host => localhost:8080
-            protocol => http
-            homedomain => http://localhost:8080
-            homepath => /api
-            home,realhome => http://localhost:8080/api
-            ip => 127.0.0.1
-            method => GET
-            path => /hello/echo
-            query => a=1&b=2
-            fullpath => /hello/echo?a=1&b=2
-
-        lessweb use ctx.path in routing.
-    """
-    def __init__(self, app=None) -> None:
+    def __init__(self, app: 'Application') -> None:
         self.app_stack: List = []
-        self.app = app
-        self.view = None
-        self._aliases: Dict[str, str] = {}  # alias {realname: queryname}
-
-        self._url_input: Dict = {}  # Input from URL
-        self._json_input: Optional[Dict] = None  # Input from Json Body
-        self._post_data: Optional[Dict] = None  # Raw Body Input
-        self._fields: Optional[Dict] = None  # Input from Json Body and Form Fields
-        self._pipe: Storage = Storage()
-
-        self.environ: Dict = {}
-        self.env: Dict = {}
-        self.host: str = ''
-        self.protocol: str = ''
-        self.homedomain: str = ''
-        self.homepath: str = ''
-        self.home: str = ''
-        self.realhome: str = ''
-        self.ip: str = ''
-        self.method: str = ''
-        self.path: str = ''
-        self.query: str = ''
-        self.fullpath: str = ''
-        self.request: Request = Request()
-        self.response: Response = Response()
-
-    @property
-    def _field_input(self)->Dict:  # Input from Form
-        if self._json_input is not None:
-            return self._json_input
-        if self._fields is not None:
-            return self._fields
-        if self.is_json_request() and self.body_data():
-            try:
-                self._json_input = json.loads(self.body_data().decode(self.app.encoding))
-            except:
-                self._json_input = {'__error__': 'invalid json received'}
-            if not isinstance(self._json_input, dict):
-                self._json_input = {'__error__': 'invalid json received (not dict)'}
-            return self._json_input
-        else:
-            try:
-                if self.method in ['HEAD', 'DELETE']:
-                    self._fields = fields_in_query(self.query)
-                    return self._fields
-
-                # cgi.FieldStorage can raise exception when handle some input
-                if self.method == 'GET':
-                    _ = cgi.FieldStorage(environ=self.env.copy(), keep_blank_values=1)
-                else:
-                    fp = BytesIO(self.body_data())
-                    _ = cgi.FieldStorage(fp=fp, environ=self.env.copy(), keep_blank_values=1)
-                self._fields = _dictify(_)
-            except:
-                self._fields = {'__error__': 'invalid form data received'}
-        return self._fields
+        self.app: Application = app
+        self.request: Request = Request(app.encoding)
+        self.response: Response = Response(app.encoding)
 
     def __call__(self):
         return self.app_stack[-1](self)
 
-    def set_param(self, realname, realvalue):
-        self._pipe[realname] = realvalue
-
-    def get_param(self, realname, default=None):
-        return self._pipe.get(realname, default)
-
-    def set_alias(self, realname, queryname):
-        self._aliases[realname] = queryname
-
-    def is_json_request(self):
-        return self._json_input is not None or \
-               'json' in self.env.get('CONTENT_TYPE', '').lower()
-
-    def body_data(self) -> bytes:
-        if self._post_data is not None:
-            return self._post_data
-        try:
-            cl = int(self.env.get('CONTENT_LENGTH'))
-        except:
-            cl = 0
-        self._post_data = self.env['wsgi.input'].read(cl)
-        return self._post_data
-
-    def get_input(self, queryname, default=None)->Jsonizable:
-        return self._url_input[queryname] if queryname in self._url_input else \
-            self._field_input.get(queryname, default)
-
-    def get_inputs(self)->Dict[str, Jsonizable]:
-        return {**self._field_input, **self._url_input}

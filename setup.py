@@ -48,7 +48,8 @@ setup(
         classifiers=[
             ],
         keywords='lessweb web web.py',
-        packages = ['lessweb', 'lessweb.plugin', 'lessweb-stubs'],
+        #packages = ['lessweb', 'lessweb.plugin', 'lessweb-stubs'],
+        packages = ['lessweb', 'lessweb.plugin'],
         package_data={'lessweb-stubs': find_stub_files()},
         install_requires=['aiohttp', 'aiohttp_wsgi', 'requests'],
 
