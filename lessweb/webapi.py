@@ -55,9 +55,9 @@ class ParamInput:
                     file_input.setdefault(key, [])
                     file_input[key].append(MultipartFile(item))
 
-    def load_url(self, groupdict: Dict, encoding: str) -> None:
+    def load_url(self, groupdict: Dict) -> None:
         for key, val in groupdict.items():
-            self.url_input[key] = [ParamStr(unquote(val, encoding=encoding), ParamSource.Url)]
+            self.url_input[key] = [ParamStr(val, ParamSource.Url)]
 
 
 class ResponseStatus(NamedTuple):

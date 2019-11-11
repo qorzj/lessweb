@@ -3,13 +3,14 @@ import requests
 import unittest
 
 
-class TestLevelBottom(unittest.TestCase):
+# 测试非aiohttp作为server的情况
+class TestLevelBottomSimple(unittest.TestCase):
     down_cmd: str
 
     def setUp(self) -> None:
-        os.system("python web_001_level_bottom.py &")
+        os.system("python web_001_level_bottom.py simple &")
         os.system("sleep 1")
-        self.down_cmd = requests.patch('http://localhost:8080/api/').text
+        self.down_cmd = requests.patch('http://localhost:8080/').text
 
     def test(self):
         url = 'http://localhost:8080/api/%C4%E3%BA%C3/index.php?m=admin&c=index&a=%C4%E3%BA%C3'
@@ -19,13 +20,13 @@ class TestLevelBottom(unittest.TestCase):
         expect_text = """localhost:8080
 http
 http://localhost:8080
-/api
-http://localhost:8080/api
+
+http://localhost:8080
 127.0.0.1
 GET
-/你好/index.php
+/api/你好/index.php
 m=admin&c=index&a=%C4%E3%BA%C3
-http://localhost:8080/api/%C4%E3%BA%C3/index.php?m=admin&c=index&a=%C4%E3%BA%C3"""
+http://localhost:8080"""
         self.assertEqual(expect_text, resp.text)
 
     def tearDown(self) -> None:

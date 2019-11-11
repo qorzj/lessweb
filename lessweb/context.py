@@ -5,6 +5,7 @@ import os
 
 from io import BytesIO
 from requests.structures import CaseInsensitiveDict
+from urllib.parse import unquote
 
 from .storage import Storage
 from .webapi import Cookie, HttpStatus, ResponseStatus, ParamInput
@@ -61,7 +62,7 @@ class Request:
         self.home: str = ''
         self.ip: str = ''
         self.method: str = ''
-        self.path: str = ''
+        self.path: str = ''  # ctx.path是路由的依据，因此是unquote之后的结果
         self.query: str = ''
         self.fullpath: str = ''
 
@@ -71,6 +72,8 @@ class Request:
         self.file_input: Dict[str, List[MultipartFile]] = {}  # Uploaded File Inputs
 
     def load(self, env):
+        encoding = self.encoding
+        request_uri = env.get('REQUEST_URI')
         self.environ = self.env = env
         self.host = env.get('HTTP_HOST', '[unknown]')
         if env.get('wsgi.url_scheme') in ['http', 'https']:
@@ -82,26 +85,29 @@ class Request:
         self.homedomain = self.protocol + '://' + self.host
         self.homepath = os.environ.get('REAL_SCRIPT_NAME', env.get('SCRIPT_NAME', ''))
         self.home = self.homedomain + self.homepath
-        self.ip = env.get('REMOTE_ADDR')
-        self.method = env.get('REQUEST_METHOD')
-        self.path = env.get('PATH_INFO')
-        self.query = env.get('QUERY_STRING')
-        self.fullpath = self.homedomain + env.get('REQUEST_URI')
+        self.ip = env.get('REMOTE_ADDR', '0.0.0.0')
+        self.method = env.get('REQUEST_METHOD', '')
+        if request_uri is not None:
+            self.path = unquote(request_uri.split('?', 1)[0][len(self.homepath):], encoding=encoding)
+        else:
+            self.path = env.get('PATH_INFO', '').encode('ISO-8859-1').decode(encoding, 'ignore')  # cannot support servers which throw error here!
+        self.query = env.get('QUERY_STRING', '')
+        self.fullpath = self.homedomain + (request_uri or '')
         # init cookie
         if not self._cookies and self.contains_header('cookie'):
             self._cookies = parse_cookie(self.get_header('cookie'))
         # parse query params
-        self.param_input.load_query(self.query, self.encoding)
+        self.param_input.load_query(self.query, encoding)
         # load body data
         cl = eafp(lambda: int(self.env.get('CONTENT_LENGTH')), 0)
         self.body_data = self.env['wsgi.input'].read(cl) if cl else None
         # parse form params
         if self.body_data:
             if self.is_json():
-                self.json_input = eafp(lambda: json.loads(self.body_data.decode(self.encoding)),
+                self.json_input = eafp(lambda: json.loads(self.body_data.decode(encoding)),
                                        {'__error__': 'invalid json received'})
             elif self.is_form():
-                eafp(lambda: self.param_input.load_form(self.body_data, self.env, self.encoding, self.file_input), None)
+                eafp(lambda: self.param_input.load_form(self.body_data, self.env, encoding, self.file_input), None)
 
 
     def set_alias(self, realname, queryname):

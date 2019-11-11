@@ -109,12 +109,11 @@ class Application(object):
         app.run(port=8080)
 
     """
-    def __init__(self, encoding='utf-8', debug=True) -> None:
+    def __init__(self, encoding='utf-8') -> None:
         self.mapping: List[Mapping] = []
         self.interceptors: List[Interceptor] = []
         self.bridges: List[Callable] = []
         self.encoding: str = encoding
-        self.debug: bool = debug
 
     def _handle_with_dealers(self, ctx: Context):
         def _1_mapping_match():
@@ -123,7 +122,7 @@ class Application(object):
                 _ = mapping.patternobj.search(ctx.request.path)
                 if _:
                     if mapping.method == ctx.request.method or mapping.method == '*':
-                        ctx.request.param_input.load_url(_.groupdict(), self.encoding)
+                        ctx.request.param_input.load_url(_.groupdict())
                         return mapping.dealer
                     elif mapping.method != 'OPTIONS':
                         supported_methods.append(mapping.method)
@@ -223,6 +222,12 @@ class Application(object):
 
     def add_options_mapping(self, pattern, dealer):
         return self.add_mapping(pattern, 'OPTIONS', dealer)
+
+    def add_patch_interceptor(self, pattern, dealer):
+        return self.add_interceptor(pattern, 'PATCH', dealer)
+
+    def add_patch_mapping(self, pattern, dealer):
+        return self.add_mapping(pattern, 'PATCH', dealer)
 
     def add_post_interceptor(self, pattern, dealer):
         return self.add_interceptor(pattern, 'POST', dealer)
