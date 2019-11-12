@@ -13,19 +13,8 @@ class uint(int):
 Jsonizable = Union[str, int, float, Dict, List, None]
 
 
-class ParamSource(Enum):
-    Url = 1
-    Query = 2
-    Form = 3
-
-
-class ParamStr:
-    value: str
-    source: ParamSource
-
-    def __init__(self, value: str, source: ParamSource):
-        self.value = value
-        self.source = source
+class ParamStr(str):
+    pass
 
 
 class MultipartFile:
@@ -35,6 +24,9 @@ class MultipartFile:
     def __init__(self, upfile):
         self.filename = upfile.filename
         self.value = upfile.value
+
+    def __str__(self) -> str:
+        return f'<MultipartFile filename={self.filename} value={self.value}>'
 
 
 class RequestBridge:
@@ -51,11 +43,11 @@ class RequestBridge:
 
     def default_cast(self, inputval: Union[ParamStr, Jsonizable], real_type: Type) -> Any:
         if real_type == bool and isinstance(inputval, ParamStr):
-            if inputval.value == '✓': return True
-            if inputval.value == '✗': return False
+            if inputval == '✓': return True
+            if inputval == '✗': return False
         if issubclass(real_type, int):
-            n = int(inputval.value if isinstance(inputval, ParamStr) else inputval)
+            n = int(inputval)
             if real_type == uint and n < 0:
                 raise ValueError("invalid range for uint(): '%s'" % n)
             return real_type(n)
-        return real_type(inputval.value if isinstance(inputval, ParamStr) else inputval)
+        return real_type(inputval)

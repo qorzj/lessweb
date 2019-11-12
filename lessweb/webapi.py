@@ -5,7 +5,7 @@ from http.cookies import Morsel, SimpleCookie, CookieError
 from urllib.parse import parse_qs, unquote
 from enum import Enum
 from typing import NamedTuple
-from .bridge import ParamSource, ParamStr, MultipartFile
+from .bridge import ParamStr, MultipartFile
 
 
 mimetypes = {
@@ -30,9 +30,9 @@ http_methods = (
 
 class ParamInput:
     def __init__(self):
-        self.url_input: Dict[str, List[ParamStr]] = {}  # Input from URL
+        self.url_input: Dict[str, ParamStr] = {}  # Input from URL
         self.query_input: Dict[str, List[ParamStr]] = {}  # Input from Query
-        self.form_input: Dict[str, List[ParamStr]] = {}  # Input from Form
+        self.form_input: Dict[str, List[ParamStr]] = {}  # Input from Form. form_input contains query_input
 
     def load_query(self, query: str, encoding: str) -> None:
         if query and query[0] == '?':
@@ -40,7 +40,7 @@ class ParamInput:
         parse_ret = parse_qs(query, keep_blank_values=True, encoding=encoding)
         for key, vals in parse_ret.items():
             self.query_input.setdefault(key, [])
-            self.query_input[key].extend(ParamStr(val, ParamSource.Query) for val in vals)
+            self.query_input[key].extend(ParamStr(val) for val in vals)
 
     def load_form(self, body: bytes, env: Dict, encoding: str, file_input: Dict[str, List[MultipartFile]]) -> None:
         parse_ret = cgi.FieldStorage(fp=BytesIO(body), environ=env.copy(), keep_blank_values=1, encoding=encoding)
@@ -50,14 +50,14 @@ class ParamInput:
             for item in parse_ret[key]:
                 if item.filename is None:  # 非文件
                     self.form_input.setdefault(key, [])
-                    self.form_input[key].append(ParamStr(item.value, ParamSource.Form))
+                    self.form_input[key].append(ParamStr(item.value))
                 else:  # 文件
                     file_input.setdefault(key, [])
                     file_input[key].append(MultipartFile(item))
 
     def load_url(self, groupdict: Dict) -> None:
         for key, val in groupdict.items():
-            self.url_input[key] = [ParamStr(val, ParamSource.Url)]
+            self.url_input[key] = ParamStr(val)
 
 
 class ResponseStatus(NamedTuple):

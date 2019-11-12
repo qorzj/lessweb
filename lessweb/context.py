@@ -119,12 +119,12 @@ class Request:
     def get_param(self, realname, default=None):
         return self._pipe.get(realname, default)
 
-    def is_json(self):
+    def is_json(self) -> bool:
         return 'json' in self.env.get('CONTENT_TYPE', '').lower()
 
-    def is_form(self):
+    def is_form(self) -> bool:
         content_type = self.env.get('CONTENT_TYPE', '').lower()
-        return not content_type or 'form-' in content_type or '-urlencoded' in content_type
+        return bool(content_type) and ('form-' in content_type or '-urlencoded' in content_type)
 
     def contains_cookie(self, name: str) -> bool:
         return name in self._cookies
@@ -150,11 +150,11 @@ class Request:
     def get_input(self, key: str) -> Optional[Union[ParamStr, Jsonizable]]:
         param = self.param_input
         if key in param.url_input:
-            return param.url_input[key][0]
+            return param.url_input[key]
+        elif key in param.form_input:  # must in front of query_input
+            return param.form_input[key][0]
         elif key in param.query_input:
             return param.query_input[key][0]
-        elif key in param.form_input:
-            return param.form_input[key][0]
         elif isinstance(self.json_input, dict):
             return self.json_input.get(key, None)
         else:
