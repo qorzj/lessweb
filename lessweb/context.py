@@ -90,7 +90,7 @@ class Request:
         if request_uri is not None:
             self.path = unquote(request_uri.split('?', 1)[0][len(self.homepath):], encoding=encoding)
         else:
-            self.path = env.get('PATH_INFO', '').encode('ISO-8859-1').decode(encoding, 'ignore')  # cannot support servers which throw error here!
+            self.path = env.get('PATH_INFO', '')  # you have to follow your server's default path encoding
         self.query = env.get('QUERY_STRING', '')
         self.fullpath = self.homedomain + (request_uri or '')
         # init cookie

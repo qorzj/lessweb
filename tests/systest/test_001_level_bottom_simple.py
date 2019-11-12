@@ -3,7 +3,8 @@ import requests
 import unittest
 
 
-# 测试非aiohttp作为server的情况
+# 测试用wsgiref.simple_server代替aiohttp的情况
+# 默认path编码为ISO-8859-1，且无REQUEST_URI，因此path上不支持非ASCII文本
 class TestLevelBottomSimple(unittest.TestCase):
     down_cmd: str
 
@@ -13,7 +14,7 @@ class TestLevelBottomSimple(unittest.TestCase):
         self.down_cmd = requests.patch('http://localhost:8080/').text
 
     def test(self):
-        url = 'http://localhost:8080/api/%C4%E3%BA%C3/index.php?m=admin&c=index&a=%C4%E3%BA%C3'
+        url = 'http://localhost:8080/api/hello/index.php?m=admin&c=index&a=%C4%E3%BA%C3'
         resp = requests.get(url)
         self.assertEqual(201, resp.status_code)
         self.assertEqual('FOUND', resp.reason)
@@ -24,7 +25,7 @@ http://localhost:8080
 http://localhost:8080
 127.0.0.1
 GET
-/api/你好/index.php
+/api/hello/index.php
 m=admin&c=index&a=%C4%E3%BA%C3
 http://localhost:8080"""
         self.assertEqual(expect_text, resp.text)
