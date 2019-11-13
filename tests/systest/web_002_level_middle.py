@@ -20,6 +20,9 @@ def f(ctx: Context):
 
 
 def g(ctx: Context):
+    upload_files = ctx.request.get_multipart_files('a')
+    assert isinstance(upload_files, list) and len(upload_files) == 1
+    assert upload_files[0].filename == 'a' and upload_files[0].value == b'111'
     return str(ctx.request.param_input.url_input) + '\n' + \
            trans(ctx.request.param_input.query_input) + '\n' + \
            trans(ctx.request.param_input.form_input) + '\n' + \
@@ -40,6 +43,7 @@ app.add_patch_mapping('.*', pid)
 app.add_get_mapping('/api/(?P<m>.*)/index.php', f)
 app.add_get_mapping('.*', f)
 app.add_post_mapping('/(?P<a>.*)/', g)
+app.add_post_mapping('/', g)
 
 if __name__ == '__main__':
     app.run()

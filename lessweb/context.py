@@ -160,6 +160,9 @@ class Request:
         else:
             return None
 
+    def get_multipart_files(self, key: str) -> List[MultipartFile]:
+        return self.file_input.get(key, [])
+
 
 class Response:
     def __init__(self, encoding: str):

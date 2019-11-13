@@ -34,6 +34,42 @@ True
 yz,None"""
         self.assertEqual(expect_text, resp.text)
 
+        url = 'http://localhost:8080?a=xy&a=wx'
+        resp = requests.post(url, {'a': 'vw'}, files={'a': b'111'})
+        expect_text = """{}
+{'a': ['xy', 'wx']}
+{'a': ['xy', 'wx', 'vw']}
+None
+{'a': ["<MultipartFile filename=a value=b'111'>"]}
+False
+True
+xy,None"""
+        self.assertEqual(expect_text, resp.text)
+
+        url = 'http://localhost:8080?b=xy&b=wx'
+        resp = requests.post(url, {'a': 'vw'}, files={'a': b'111'})
+        expect_text = """{}
+{'b': ['xy', 'wx']}
+{'a': ['vw'], 'b': ['xy', 'wx']}
+None
+{'a': ["<MultipartFile filename=a value=b'111'>"]}
+False
+True
+vw,xy"""
+        self.assertEqual(expect_text, resp.text)
+
+        url = 'http://localhost:8080?b=xy&b=wx'
+        resp = requests.post(url, {'b': 'vw'}, files={'a': b'111'})
+        expect_text = """{}
+{'b': ['xy', 'wx']}
+{'b': ['xy', 'wx', 'vw']}
+None
+{'a': ["<MultipartFile filename=a value=b'111'>"]}
+False
+True
+None,xy"""
+        self.assertEqual(expect_text, resp.text)
+
     def tearDown(self) -> None:
         os.system(self.down_cmd)
 

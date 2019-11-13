@@ -47,7 +47,8 @@ class ParamInput:
         if parse_ret.list is None: # hack to make input work with enctype='text/plain.
             parse_ret.list = []
         for key in parse_ret.keys():
-            for item in parse_ret[key]:
+            val = parse_ret[key]
+            for item in (val if isinstance(val, list) else [val]):
                 if item.filename is None:  # 非文件
                     self.form_input.setdefault(key, [])
                     self.form_input[key].append(ParamStr(item.value))
