@@ -20,9 +20,12 @@ def f(ctx: Context):
 
 
 def g(ctx: Context):
-    upload_files = ctx.request.get_multipart_files('a')
-    assert isinstance(upload_files, list) and len(upload_files) == 1
-    assert upload_files[0].filename == 'a' and upload_files[0].value == b'111'
+    upload_files = ctx.request.get_uploaded_files('a')
+    if ctx.request.is_json():
+        assert isinstance(upload_files, list) and len(upload_files) == 0
+    else:
+        assert isinstance(upload_files, list) and len(upload_files) == 1
+        assert upload_files[0].filename == 'a' and upload_files[0].value == b'111'
     return str(ctx.request.param_input.url_input) + '\n' + \
            trans(ctx.request.param_input.query_input) + '\n' + \
            trans(ctx.request.param_input.form_input) + '\n' + \

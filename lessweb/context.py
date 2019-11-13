@@ -160,7 +160,7 @@ class Request:
         else:
             return None
 
-    def get_multipart_files(self, key: str) -> List[MultipartFile]:
+    def get_uploaded_files(self, key: str) -> List[MultipartFile]:
         return self.file_input.get(key, [])
 
 

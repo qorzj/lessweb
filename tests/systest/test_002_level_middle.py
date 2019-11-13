@@ -70,6 +70,18 @@ True
 None,xy"""
         self.assertEqual(expect_text, resp.text)
 
+        url = 'http://localhost:8080?b=wx'
+        resp = requests.post(url, json={'a': [True, 'uv', 123]})
+        expect_text = """{}
+{'b': ['wx']}
+{}
+{'a': [True, 'uv', 123]}
+{}
+True
+False
+[True, 'uv', 123],wx"""
+        self.assertEqual(expect_text, resp.text)
+
     def tearDown(self) -> None:
         os.system(self.down_cmd)
 
