@@ -10,7 +10,7 @@ import os
 import re
 import traceback
 from types import GeneratorType
-from typing import List, Any, Callable, Type
+from typing import List, Any, Callable, Type, Tuple
 from urllib.parse import splitquery, urlencode
 from io import BytesIO
 from contextlib import contextmanager
@@ -21,7 +21,7 @@ from .context import Context
 from .model import fetch_param
 from .storage import Storage
 from .utils import eafp, re_standardize, makedir
-from .bridge import RequestBridge
+from .bridge import RequestBridge, make_response_encoder
 
 
 __all__ = [
@@ -112,7 +112,8 @@ class Application(object):
     def __init__(self, encoding='utf-8') -> None:
         self.mapping: List[Mapping] = []
         self.interceptors: List[Interceptor] = []
-        self.bridges: List[Callable] = []
+        self.request_bridges: List[Callable] = []
+        self.response_bridges: List[Callable] = []
         self.encoding: str = encoding
 
     def _handle_with_dealers(self, ctx: Context):
@@ -163,8 +164,11 @@ class Application(object):
         patternobj = re.compile(re_standardize(pattern))
         self.interceptors.insert(0, Interceptor(pattern, method, dealer, patternobj))
 
-    def add_bridge(self, bridge: Callable):
-        self.bridges.append(bridge)
+    def add_request_bridge(self, bridge_func: Callable):
+        self.request_bridges.append(bridge_func)
+
+    def add_response_bridge(self, bridge_func: Callable):
+        self.response_bridges.append(bridge_func)
 
     def add_mapping(self, pattern, method, dealer):
         """
@@ -274,9 +278,7 @@ class Application(object):
                     result = _1_peep(resp)
                 else:
                     if not isinstance(resp, (bytes, str)) and resp is not None:
-                        baseBridge = BaseBridge()
-                        baseBridge.init_for_cast(self.bridges)
-                        resp = json.dumps(baseBridge.cast(resp, type(resp), Jsonizable))
+                        resp = json.dumps(resp, cls=make_response_encoder(self.response_bridges))
                         mimekey = 'json'
                     result = (resp,)
                 if not ctx.response.get_header('Content-Type'):

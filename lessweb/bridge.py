@@ -1,9 +1,9 @@
 # 存放与类型转换有关的类型定义，且不依赖同级其他库
 from enum import Enum
-from typing import Type, TypeVar, get_type_hints, Any, Tuple, List, Callable, Union, Dict
-from abc import abstractmethod, ABCMeta
-from .typehint import issubtyping
-from .utils import func_arg_spec
+from datetime import datetime as Datetime
+from json import JSONEncoder
+from itertools import chain
+from typing import Type, List, Callable, Union, Dict, Any
 
 
 class uint(int):
@@ -29,6 +29,25 @@ class MultipartFile:
         return f'<MultipartFile filename={self.filename} value={self.value}>'
 
 
+def default_request_bridge(inputval: Union[ParamStr, Jsonizable], real_type: Type) -> Any:
+    if real_type == bool and isinstance(inputval, ParamStr):
+        if inputval == '✓': return True
+        if inputval == '✗': return False
+    if issubclass(real_type, int):
+        n = int(inputval)
+        if real_type == uint and n < 0:
+            raise ValueError("invalid range for uint(): '%s'" % n)
+        return real_type(n)
+    return real_type(inputval)
+
+
+def default_response_bridge(obj: Any) -> Jsonizable:
+    if isinstance(obj, Datetime):
+        return obj.isoformat()
+    if isinstance(obj, Enum):
+        return obj.value
+
+
 class RequestBridge:
     def __init__(self, bridge_funcs: List[Callable]):
         self.bridges: List[Callable] = bridge_funcs
@@ -39,15 +58,19 @@ class RequestBridge:
             if dest_val is not None:
                 return dest_val
 
-        return self.default_cast(inputval, real_type)
+        return default_request_bridge(inputval, real_type)
 
-    def default_cast(self, inputval: Union[ParamStr, Jsonizable], real_type: Type) -> Any:
-        if real_type == bool and isinstance(inputval, ParamStr):
-            if inputval == '✓': return True
-            if inputval == '✗': return False
-        if issubclass(real_type, int):
-            n = int(inputval)
-            if real_type == uint and n < 0:
-                raise ValueError("invalid range for uint(): '%s'" % n)
-            return real_type(n)
-        return real_type(inputval)
+
+def make_response_encoder(bridge_funcs: List[Callable]):
+    class ResponseEncoder(JSONEncoder):
+        def default(self, obj):
+            if obj is None:
+                return obj
+            for bridge_func in chain(bridge_funcs, [default_response_bridge]):
+                dest_val = bridge_func(obj)
+                if dest_val is not None:
+                    return dest_val
+
+            return JSONEncoder.default(self, obj)
+
+    return ResponseEncoder
