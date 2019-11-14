@@ -10,10 +10,7 @@ import os
 import re
 import traceback
 from types import GeneratorType
-from typing import List, Any, Callable, Type, Tuple
-from urllib.parse import splitquery, urlencode
-from io import BytesIO
-from contextlib import contextmanager
+from typing import List, Any, Callable
 
 from .webapi import NeedParamError, BadParamError, NotFoundError, HttpStatus
 from .webapi import http_methods

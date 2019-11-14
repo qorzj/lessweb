@@ -71,6 +71,6 @@ def make_response_encoder(bridge_funcs: List[Callable]):
                 if dest_val is not None:
                     return dest_val
 
-            return JSONEncoder.default(self, obj)
+            return str(obj)
 
     return ResponseEncoder
