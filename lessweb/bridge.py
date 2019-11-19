@@ -4,6 +4,7 @@ from datetime import datetime as Datetime
 from json import JSONEncoder
 from itertools import chain
 from typing import Type, List, Callable, Union, Dict, Any
+from .storage import Storage
 
 
 class uint(int):
@@ -70,7 +71,9 @@ def make_response_encoder(bridge_funcs: List[Callable]):
                 dest_val = bridge_func(obj)
                 if dest_val is not None:
                     return dest_val
-
-            return str(obj)
+            try:
+                return Storage.of(obj)
+            except:
+                return str(obj)
 
     return ResponseEncoder

@@ -15,6 +15,5 @@ from .context import Context, Request, Response
 from .model import Model, Service
 from .storage import Storage
 from .bridge import RequestBridge, uint, ParamStr, MultipartFile
-from .typehint import issubtyping, AnySub
 from .webapi import NeedParamError, BadParamError, NotFoundError, Cookie, HttpStatus, ResponseStatus
 from .utils import _nil, eafp

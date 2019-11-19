@@ -51,5 +51,6 @@ class Storage(dict):
     def of(obj):
         result = Storage()
         for name in get_type_hints(obj).keys():
-            result[name] = getattr(obj, name)
+            if name[0] != '_':
+                result[name] = getattr(obj, name)
         return result

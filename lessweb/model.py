@@ -4,7 +4,7 @@ from abc import ABCMeta
 from .context import Context, Request, Response
 from .webapi import NeedParamError, BadParamError
 from .bridge import Jsonizable, MultipartFile
-from .typehint import generic_origin
+from .typehint import optional_core, generic_core, is_optional_type, is_generic_type, get_origin
 from .utils import func_arg_spec
 from .storage import Storage
 from .bridge import RequestBridge
@@ -19,6 +19,9 @@ class Model(Generic[T]):
 
     def get(self) -> T:
         return self.value
+
+    def __str__(self):
+        return f'lessweb.Model[{type(self.value)}]'
 
 
 class Service(metaclass=ABCMeta):
@@ -45,7 +48,7 @@ def fetch_service(ctx: Context, service_type: Type):
     return service_type(**params)
 
 
-def fetch_model(ctx: Context, model_type: Type[Model]):
+def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_type: Type):
     """
         >>> from lessweb.storage import Storage
         >>> class Person(Model):
@@ -58,31 +61,27 @@ def fetch_model(ctx: Context, model_type: Type[Model]):
         >>> model = fetch_model(ctx, Person)
         >>> assert Storage.of(model) == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
     """
-    object = model_type()
-    bridge = BaseBridge()
-    bridge.init_for_cast(ctx.app.bridges)
-    fields = ctx.get_inputs()
-    for realname, realtype in get_type_hints(model_type).items():
+    fields = {}
+    for realname, realtype in get_type_hints(core_type).items():
         if realname[0] == '_': continue  # 私有成员不赋值
-        queryname = ctx._aliases.get(realname, realname)
-        if queryname not in fields:  # 缺输入
-            if generic_origin(realtype) == Optional:
-                setattr(object, realname, None)
-            else:
-                pass  # 不赋值&不报错
-        elif realtype == UploadedFile:
-            queryvalue = fields[queryname]
-            if not isinstance(queryvalue, UploadedFile):
-                raise BadParamError(query=realname, error='Uploaded File Only')
-            setattr(object, realname, queryvalue)
-        else:  # 输入的类型转换
+        queryname = ctx.request._aliases.get(realname, realname)
+        inputval = ctx.request.get_input(queryname)
+        if not isinstance(realtype, type):
+            continue
+        if is_optional_type(realtype):
+            realtype = optional_core(realtype)
+        if inputval is not None:
             try:
-                queryvalue = fields[queryname]
-                realvalue = bridge.cast(queryvalue, type(queryvalue), realtype)
-                setattr(object, realname, realvalue)
+                fields[realname] = bridge.cast(inputval, realtype)
             except (ValueError, TypeError) as e:
                 raise BadParamError(query=realname, error=str(e))
-    return object
+        else:
+            pass  # 不赋值&不报错
+    if origin_type == Model:
+        object = core_type()
+        for key, val in fields.items():
+            setattr(object, key, val)
+        return Model(object)
 
 
 def fetch_param(ctx: Context, fn: Callable):
@@ -96,22 +95,27 @@ def fetch_param(ctx: Context, fn: Callable):
         >>> assert param == {'ctx': ctx, 'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
     """
     result = {}
-    bridge = RequestBridge(ctx.app.bridges)
+    bridge = RequestBridge(ctx.app.request_bridges)
     for realname, (realtype, has_default) in func_arg_spec(fn).items():
         if realname == 'return': continue
+        if not isinstance(realtype, type): continue
         if realtype == Context:
             result[realname] = ctx
         elif realtype == Request:
             result[realname] = ctx.request
         elif realtype == Response:
             result[realname] = ctx.response
-        elif isinstance(realtype, type) and issubclass(realtype, Service):
+        elif issubclass(realtype, Service):
             result[realname] = fetch_service(ctx, realtype)
-        elif isinstance(realtype, type) and issubclass(realtype, Model):
-            result[realname] = fetch_model(ctx, realtype)
+        elif is_generic_type(realtype):
+            if get_origin(realtype) == Model:
+                result[realname] = fetch_model(ctx, bridge, generic_core(realtype), Model)
         else:
             queryname = ctx.request._aliases.get(realname, realname)
             inputval = ctx.request.get_input(queryname)
+            realtype = optional_core(realtype)
+            if is_optional_type(realtype):
+                realtype = optional_core(realtype)
             if inputval is not None:
                 try:
                     result[realname] = bridge.cast(inputval, realtype)
