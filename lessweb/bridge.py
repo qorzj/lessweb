@@ -39,7 +39,10 @@ def default_request_bridge(inputval: Union[ParamStr, Jsonizable], real_type: Typ
         if real_type == uint and n < 0:
             raise ValueError("invalid range for uint(): '%s'" % n)
         return real_type(n)
-    return real_type(inputval)
+    if type(inputval) is real_type:
+        return inputval
+    else:
+        return real_type(inputval)
 
 
 def default_response_bridge(obj: Any) -> Jsonizable:

@@ -271,14 +271,19 @@ class Application(object):
             try:
                 mimekey = 'html'
                 resp = self._handle_with_dealers(ctx)
+                resp_content_type = ctx.response.get_header('Content-Type')
                 if isinstance(resp, GeneratorType):
                     result = _1_peep(resp)
                 else:
                     if not isinstance(resp, (bytes, str)) and resp is not None:
-                        resp = json.dumps(resp, cls=make_response_encoder(self.response_bridges))
-                        mimekey = 'json'
+                        if not resp_content_type or \
+                                (resp_content_type and 'json' in resp_content_type.lower()):
+                            resp = json.dumps(resp, cls=make_response_encoder(self.response_bridges))
+                            mimekey = 'json'
+                        else:
+                            resp = str(resp)
                     result = (resp,)
-                if not ctx.response.get_header('Content-Type'):
+                if not resp_content_type:
                     ctx.response.send_content_type(mimekey=mimekey, encoding=self.encoding)
             except Exception as e:
                 logging.exception(e)
