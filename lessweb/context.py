@@ -51,6 +51,7 @@ class Request:
         self._cookies: Dict[str, str] = {}
         self._aliases: Dict[str, str] = {}  # alias {realname: queryname}
         self._pipe: Dict[str, Any] = {}
+        self._params: Dict[str, Union[ParamStr, Jsonizable, None]] = {}
 
         self.encoding: str = encoding
         self.environ: Dict = {}
@@ -148,17 +149,21 @@ class Request:
         return [s for s in (header_name_of_wsgi_key(k) for k in self.env.keys()) if s]
 
     def get_input(self, key: str) -> Optional[Union[ParamStr, Jsonizable]]:
+        if key in self._params:
+            # 此处使用cache不只是为了性能，更重要的是cgi不保证重名参数的顺序，如果每次得到的结果可能不同，会导致安全性漏洞
+            return self._params[key]
         param = self.param_input
         if key in param.url_input:
-            return param.url_input[key]
+            self._params[key] = ret = param.url_input[key]
         elif key in param.form_input:  # must in front of query_input
-            return param.form_input[key][0]
+            self._params[key] = ret = param.form_input[key][0]
         elif key in param.query_input:
-            return param.query_input[key][0]
+            self._params[key] = ret = param.query_input[key][0]
         elif isinstance(self.json_input, dict):
-            return self.json_input.get(key, None)
+            self._params[key] = ret = self.json_input.get(key, None)
         else:
-            return None
+            self._params[key] = ret = None
+        return ret
 
     def get_uploaded_files(self, key: str) -> List[MultipartFile]:
         return self.file_input.get(key, [])

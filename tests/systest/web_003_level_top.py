@@ -1,5 +1,5 @@
 import os
-from lessweb import Application, Context, ResponseStatus, ParamStr, MultipartFile, Model
+from lessweb import Application, Context, Request, ResponseStatus, ParamStr, MultipartFile, Model, uint
 
 
 def load_complex(n, real_type):
@@ -33,7 +33,11 @@ def f(a: complex = None):
 
 def g(x: Model[A]):
     a = x.get()
-    return {'x': a.x, 'y': a.y, 'z': a, 'X': x}
+    return {'x': a.x, 'y': a.y, 'z': a}
+
+
+def h(a: bool, b: uint):
+    return {'a': a, 'b': b}
 
 
 def pid():
@@ -43,7 +47,13 @@ def pid():
 app = Application(encoding='gb2312')
 app.add_patch_mapping('.*', pid)
 app.add_get_mapping('/complex', f)
+app.add_post_mapping('/complex', f)
+
 app.add_get_mapping('/model', g)
+app.add_post_mapping('/model', g)
+
+app.add_get_mapping('/other', h)
+app.add_post_mapping('/other', h)
 
 app.add_request_bridge(load_complex)
 app.add_response_bridge(dump_complex)

@@ -66,10 +66,10 @@ def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_typ
         if realname[0] == '_': continue  # 私有成员不赋值
         queryname = ctx.request._aliases.get(realname, realname)
         inputval = ctx.request.get_input(queryname)
-        if not isinstance(realtype, type):
-            continue
         if is_optional_type(realtype):
             realtype = optional_core(realtype)
+        if not isinstance(realtype, type):
+            continue
         if inputval is not None:
             try:
                 fields[realname] = bridge.cast(inputval, realtype)
@@ -98,7 +98,6 @@ def fetch_param(ctx: Context, fn: Callable):
     bridge = RequestBridge(ctx.app.request_bridges)
     for realname, (realtype, has_default) in func_arg_spec(fn).items():
         if realname == 'return': continue
-        if not isinstance(realtype, type): continue
         if realtype == Context:
             result[realname] = ctx
         elif realtype == Request:
@@ -111,11 +110,12 @@ def fetch_param(ctx: Context, fn: Callable):
             if get_origin(realtype) == Model:
                 result[realname] = fetch_model(ctx, bridge, generic_core(realtype), Model)
         else:
-            queryname = ctx.request._aliases.get(realname, realname)
-            inputval = ctx.request.get_input(queryname)
-            realtype = optional_core(realtype)
             if is_optional_type(realtype):
                 realtype = optional_core(realtype)
+            if not isinstance(realtype, type):
+                continue
+            queryname = ctx.request._aliases.get(realname, realname)
+            inputval = ctx.request.get_input(queryname)
             if inputval is not None:
                 try:
                     result[realname] = bridge.cast(inputval, realtype)

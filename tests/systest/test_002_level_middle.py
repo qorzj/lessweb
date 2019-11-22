@@ -6,6 +6,13 @@ import unittest
 class TestLevelBottom(unittest.TestCase):
     down_cmd: str
 
+    def checkLines(self, expect, actual):
+        for a, b in zip(expect.splitlines(), actual.splitlines()):
+            if a.startswith('{'):
+                self.assertDictEqual(eval(a), eval(b))
+            else:
+                self.assertEqual(a, b)
+
     def setUp(self) -> None:
         os.system("python web_002_level_middle.py &")
         os.system("sleep 1")
@@ -56,7 +63,7 @@ None
 False
 True
 vw,xy"""
-        self.assertEqual(expect_text, resp.text)
+        self.checkLines(expect_text, resp.text)
 
         url = 'http://localhost:8080?b=xy&b=wx'
         resp = requests.post(url, {'b': 'vw'}, files={'a': b'111'})
