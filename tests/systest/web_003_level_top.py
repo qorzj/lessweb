@@ -44,7 +44,7 @@ def pid():
     return f'kill {os.getpid()}'
 
 
-app = Application(encoding='gb2312')
+app = Application()
 app.add_patch_mapping('.*', pid)
 app.add_get_mapping('/complex', f)
 app.add_post_mapping('/complex', f)

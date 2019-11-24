@@ -296,7 +296,7 @@ class Application(object):
                     if isinstance(r, bytes):
                         yield r
                     elif isinstance(r, str):
-                        yield r.encode(self.encoding)
+                        yield r.encode(self.encoding, 'replace')
                     elif r is None:
                         yield b''
                     else:
