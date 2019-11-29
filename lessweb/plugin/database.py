@@ -11,7 +11,7 @@ from sqlalchemy.ext.declarative import as_declarative, declared_attr
 from ..context import Context
 from ..model import Service
 
-__all__ = ["global_data", "DbModel", "DbServ", "init", "processor", "create_all", "make_session",
+__all__ = ["global_data", "DbModel", "DbServ", "init", "processor", "create_tables", "make_session",
            "cast_model", "cast_models"]
 
 
@@ -31,7 +31,7 @@ class DbServ(Service):
 
     def __init__(self, ctx: Context):
         self.ctx = ctx
-        self.db = ctx.get_param(DatabaseKey.session)
+        self.db = ctx.request.get_param(DatabaseKey.session)
 
 
 global_data = GlobalData()
@@ -48,26 +48,30 @@ class DbModel(object):
 
 
 @overload
-def init(*, dburi, echo=True, autoflush=True, autocommit=False): ...
+def init(*, uri, echo=True, autoflush=True, autocommit=False): ...
 @overload
 def init(*, protocol, username, password, host, port:int, database, echo=True, autoflush=True, autocommit=False): ...
 
 
-def init(*, protocol=None, username=None, password=None, host=None, port:int=None, database=None, dburi=None,
+def init(*, protocol=None, username=None, password=None, host=None, port:int=None, database=None, uri=None,
          echo:bool=True, autoflush=True, autocommit=False):
     """
     Database requirements:
         sqlalchemy
 
     Drivers requirements:
-        protocol = mysql+mysqlconnector (default-port = 3306)
+        protocol (default) = 'sqlite:///'
+            (None)
+        protocol = 'mysql+mysqlconnector' (default-port = 3306)
             mysql-connector==2.1.4
-        protocol = postgresql (default-port = 5432)
+        protocol = 'postgresql' (default-port = 5432)
             psycopg2
 
     """
-    if dburi:
-        engine = create_engine(dburi, pool_recycle=3600)
+    if uri:
+        if '://' not in uri:
+            uri = 'sqlite:///' + uri
+        engine = create_engine(uri, pool_recycle=3600)
     else:
         engine = create_engine(
             '{protocol}://{username}:{password}@{host}:{port}/{database}'.format(
@@ -86,7 +90,7 @@ def init(*, protocol=None, username=None, password=None, host=None, port:int=Non
 def processor(ctx: Context):
     db = global_data.db_session_maker()
     try:
-        ctx.set_param(DatabaseKey.session, db)
+        ctx.request.set_param(DatabaseKey.session, db)
         if global_data.autocommit:
             with db.begin():
                 return ctx()
@@ -99,15 +103,11 @@ def processor(ctx: Context):
         db.close()
 
 
-def create_all(*DbModelClass):
+def create_tables(*DbModelClass):
     """
     init(...)
-    create_all(DbUser, DbOrder, ...)
-    create_all([DbUser, DbOrder, ...])
+    create_tables(DbUser, DbOrder, ...)
     """
-    if len(DbModelClass) == 1 and isinstance(DbModelClass[0], (list, tuple)):
-        return create_all(*DbModelClass[0])
-
     for db_class in DbModelClass:
         db_class.metadata.create_all(global_data.db_engine)
 
@@ -128,34 +128,34 @@ T = TypeVar('T')
 U = TypeVar('U')
 
 
-def cast_model(modelCls: Type[T], tblObjs) -> T:
-    modelObj = modelCls()
-    modelKeys = get_type_hints(modelCls)
-    if tblObjs is None:
+def cast_model(model_class: Type[T], query_result) -> T:
+    model_object = model_class()
+    model_keys = get_type_hints(model_class)
+    if query_result is None:
         return None
 
-    if hasattr(tblObjs, '__table__'):  # 单个对象
-        for key in tblObjs.__table__.columns.keys():
-            if key in modelKeys:
-                setattr(modelObj, key, getattr(tblObjs, key))
-        return modelObj
-    elif hasattr(tblObjs, 'keys'):  # sqlalchemy.util._collections.result
-        for rowkey in tblObjs.keys():
-            rowVal = getattr(tblObjs, rowkey)
-            if hasattr(rowVal, '__table__'):  # DbModel
-                for key in rowVal.__table__.columns.keys():
-                    if key in modelKeys:
-                        setattr(modelObj, key, getattr(rowVal, key))
+    if hasattr(query_result, '__table__'):  # 单个对象
+        for key in query_result.__table__.columns.keys():
+            if key in model_keys:
+                setattr(model_object, key, getattr(query_result, key))
+        return model_object
+    elif hasattr(query_result, 'keys'):  # sqlalchemy.util._collections.result
+        for row_key in query_result.keys():
+            row_val = getattr(query_result, row_key)
+            if hasattr(row_val, '__table__'):  # DbModel
+                for key in row_val.__table__.columns.keys():
+                    if key in model_keys:
+                        setattr(model_object, key, getattr(row_val, key))
             else:  # 普通对象
-                setattr(modelObj, rowkey, rowVal)
+                setattr(model_object, row_key, row_val)
 
-        return modelObj
+        return model_object
     else:
-        raise TypeError('Cannot cast %s to Model' % str(tblObjs))
+        raise TypeError('Cannot cast %s to Model' % str(query_result))
 
 
-def cast_models(modelCls: Type[T], tblObjsList) -> List[T]:
-    return [cast_model(modelCls, x) for x in tblObjsList]
+def cast_models(model_class: Type[T], query_results: List) -> List[T]:
+    return [cast_model(model_class, x) for x in query_results]
 
 
 """
