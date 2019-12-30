@@ -19,7 +19,7 @@ from .context import Context
 from .model import fetch_param
 from .storage import Storage
 from .utils import eafp, re_standardize, makedir
-from .bridge import RequestBridge, make_response_encoder
+from .bridge import RequestBridge, make_response_encoder, RequestBridgeFunc, ResponseBridgeFunc
 
 
 __all__ = [
@@ -165,10 +165,10 @@ class Application(object):
         patternobj = re.compile(re_standardize(pattern))
         self.interceptors.insert(0, Interceptor(pattern, method, dealer, patternobj))
 
-    def add_request_bridge(self, bridge_func: Callable):
+    def add_request_bridge(self, bridge_func: RequestBridgeFunc):
         self.request_bridges.append(bridge_func)
 
-    def add_response_bridge(self, bridge_func: Callable):
+    def add_response_bridge(self, bridge_func: ResponseBridgeFunc):
         self.response_bridges.append(bridge_func)
 
     def add_mapping(self, pattern, method, dealer):
@@ -176,13 +176,10 @@ class Application(object):
         Example:
 
             from lessweb import Application
-            def sayhello(ctx, name):
+            def say_hello(ctx, name):
                 return 'Hello %s!' % name
-            def sayage(ctx, age: int, name='Bob'):
-                return 'Name: %s, Age: %d' % (name, age)
             app = Application()
-            app.add_mapping('/hello/(?P<name>.+)', 'GET', sayhello)
-            app.add_mapping('/age/(?P<age>[0-9]+)', 'GET', sayhello)
+            app.add_mapping('/hello/(?P<name>.+)', 'GET', say_hello)
             app.run()
         """
         assert isinstance(pattern, str), 'pattern:[{}] should be RegExp str'.format(pattern)

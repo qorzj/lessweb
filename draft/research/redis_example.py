@@ -1,6 +1,6 @@
 from lessweb import Application
-from lessweb.plugin import redis
-from lessweb.plugin.redis import RedisServ
+from lessweb.plugin import redisplugin
+from lessweb.plugin.redisplugin import RedisServ
 
 
 def ping(serv: RedisServ):
@@ -10,7 +10,7 @@ def ping(serv: RedisServ):
     return False
 
 
-redis.init('localhost', port=6379)
+redisplugin.init('localhost', port=6379)
 
 
 def setter(serv: RedisServ, key, value):
@@ -24,7 +24,7 @@ def getter(serv: RedisServ, key):
     return {'key': key, 'value': value.decode()}
 
 app = Application()
-app.add_interceptor('.*', method='*', dealer=redis.processor)
+app.add_interceptor('.*', method='*', dealer=redisplugin.processor)
 app.add_get_mapping('/set', setter)
 app.add_get_mapping('/get', getter)
 

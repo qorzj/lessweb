@@ -14,6 +14,10 @@ from .webapi import header_name_of_wsgi_key, wsgi_key_of_header_name
 from .webapi import parse_cookie, mimetypes
 from .utils import eafp
 
+
+__all__ = ["Request", "Response", "Context"]
+
+
 if TYPE_CHECKING:
     from lessweb.application import Application
 
@@ -50,7 +54,6 @@ class Request:
     def __init__(self, encoding: str):
         self._cookies: Dict[str, str] = {}
         self._aliases: Dict[str, str] = {}  # alias {realname: queryname}
-        self._pipe: Dict[str, Any] = {}
         self._params: Dict[str, Union[ParamStr, Jsonizable, None]] = {}
 
         self.encoding: str = encoding
@@ -113,12 +116,6 @@ class Request:
 
     def set_alias(self, realname, queryname):
         self._aliases[realname] = queryname
-
-    def set_param(self, realname, realvalue):
-        self._pipe[realname] = realvalue
-
-    def get_param(self, realname, default=None):
-        return self._pipe.get(realname, default)
 
     def is_json(self) -> bool:
         return 'json' in self.env.get('CONTENT_TYPE', '').lower()
@@ -241,6 +238,7 @@ class Context(object):
         self.app: Application = app
         self.request: Request = Request(app.encoding)
         self.response: Response = Response(app.encoding)
+        self.box: Dict = {}
 
     def __call__(self):
         return self.app_stack[-1](self)

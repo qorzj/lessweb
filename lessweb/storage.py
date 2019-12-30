@@ -1,6 +1,9 @@
 from typing import get_type_hints
 
 
+__all__ = ["Storage"]
+
+
 class Storage(dict):
     """
     A Storage object is like a dictionary except `obj.foo` can be used

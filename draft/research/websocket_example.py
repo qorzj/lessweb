@@ -2,10 +2,10 @@ import aiohttp.web
 from aiohttp_wsgi import WSGIHandler
 
 from lessweb import Application
-from lessweb.plugin import redis
-from lessweb.plugin.redis import RedisServ
+from lessweb.plugin import redisplugin
+from lessweb.plugin.redisplugin import RedisServ
 
-redis.init('localhost', port=6379)
+redisplugin.init('localhost', port=6379)
 
 async def websocket_handler(request):
     print('Websocket connection starting')
@@ -20,7 +20,7 @@ async def websocket_handler(request):
             if msg.data == 'close':
                 await ws.close()
             else:
-                who = redis.session().get('who') or b'-'
+                who = redisplugin.session().get('who') or b'-'
                 await ws.send_str(msg.data + '@' + who.decode())
 
     print('Websocket connection closed')
@@ -31,7 +31,7 @@ def setter(serv: RedisServ, who):
     return 'ok'
 
 app = Application()
-app.add_interceptor('.*', method='*', dealer=redis.processor)
+app.add_interceptor('.*', method='*', dealer=redisplugin.processor)
 app.add_get_mapping('/set', setter)
 
 if __name__ == '__main__':

@@ -7,6 +7,9 @@ import re
 import inspect
 
 
+__all__ = ["eafp", "_nil", "re_standardize", "func_arg_spec", "makedir"]
+
+
 def eafp(ask, default):
     """
     Easier to ask for forgiveness than permission
@@ -36,7 +39,7 @@ def re_standardize(pattern):
     """
         >>> pattern = re_standardize('/add/{x}/{y}')
         >>> pattern
-        '^/add/(?P<x>[0-9]+)/(?P<y>[0-9]+)$'
+        '^/add/(?P<x>[^/]+)/(?P<y>[^/]+)$'
 
         >>> re.search(pattern, '/add/234/5').groupdict()
         {'x': '234', 'y': '5'}
@@ -54,7 +57,7 @@ def re_standardize(pattern):
         pattern = pattern + '$'
     def _repl(obj):
         x = obj.groups()[0]
-        return '(?P<%s>[0-9]+)' % x
+        return '(?P<%s>[^/]+)' % x
 
     return re.sub(r'\{([^0-9].*?)\}', _repl, pattern)
 

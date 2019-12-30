@@ -1,6 +1,6 @@
 from lessweb import Service, Context, HttpStatus, interceptor, Application
-from lessweb.plugin import redis
-from lessweb.plugin.redis import RedisServ
+from lessweb.plugin import redisplugin
+from lessweb.plugin.redisplugin import RedisServ
 
 
 class LimitServ(Service):
@@ -31,13 +31,13 @@ def limit_checker(ctx: Context, limitServ: LimitServ):
         return ctx()
 
 
-@interceptor(redis.processor)
+@interceptor(redisplugin.processor)
 @interceptor(limit_checker)
 def hello(serv: LimitServ):
     return 'hello ' + serv.redis.get(serv.key).decode()
 
 
-redis.init(host='127.0.0.1', port=16379)
+redisplugin.init(host='127.0.0.1', port=16379)
 app = Application()
 app.add_get_mapping('/hello', hello)
 

@@ -7,6 +7,9 @@ from typing import Type, List, Callable, Union, Dict, Any
 from .storage import Storage
 
 
+__all__ = ["uint", "Jsonizable", "ParamStr", "MultipartFile", "RequestBridgeFunc", "ResponseBridgeFunc"]
+
+
 class uint(int):
     pass
 
@@ -28,6 +31,10 @@ class MultipartFile:
 
     def __str__(self) -> str:
         return f'<MultipartFile filename={self.filename} value={self.value}>'
+
+
+RequestBridgeFunc = Callable[[Union[ParamStr, Jsonizable], Type], Any]
+ResponseBridgeFunc = Callable[[Any], Jsonizable]
 
 
 def default_request_bridge(inputval: Union[ParamStr, Jsonizable], real_type: Type) -> Any:
@@ -53,7 +60,7 @@ def default_response_bridge(obj: Any) -> Jsonizable:
 
 
 class RequestBridge:
-    def __init__(self, bridge_funcs: List[Callable]):
+    def __init__(self, bridge_funcs: List[RequestBridgeFunc]):
         self.bridges: List[Callable] = bridge_funcs
 
     def cast(self, inputval: Union[ParamStr, Jsonizable], real_type: Type) -> Any:
@@ -65,7 +72,7 @@ class RequestBridge:
         return default_request_bridge(inputval, real_type)
 
 
-def make_response_encoder(bridge_funcs: List[Callable]):
+def make_response_encoder(bridge_funcs: List[ResponseBridgeFunc]):
     class ResponseEncoder(JSONEncoder):
         def default(self, obj):
             if obj is None:
