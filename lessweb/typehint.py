@@ -5,7 +5,7 @@ from typing_inspect import get_args, is_optional_type, is_generic_type, get_orig
 __all__ = ["optional_core", "generic_core", "is_optional_type", "is_generic_type", "get_origin"]
 
 
-def optional_core(t):
+def optional_core(t: Type) -> Type:
     """
     t is Optaional? t.core : NoneType
     """

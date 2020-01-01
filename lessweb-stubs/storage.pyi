@@ -1,5 +1,4 @@
-from typing import Any
-from unittest.mock import Mock
+__all__ = ["Storage"]
 
 
 class Storage(dict):
@@ -10,9 +9,3 @@ class Storage(dict):
     def __sub__(self, other): ...
     @staticmethod
     def of(obj) -> 'Storage': ...
-
-
-class ChainMock:
-    def __init__(self, path: str, return_value) -> None: ...
-    def join(self, path, return_value) -> 'ChainMock': ...
-    def __call__(self, path=None) -> Any: ...

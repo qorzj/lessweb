@@ -2,7 +2,6 @@ from setuptools import setup, find_packages  # Always prefer setuptools over dis
 from codecs import open  # To use a consistent encoding
 import os
 from os import path
-import subprocess
 from setuptools.command.install import install
 import re
 import ast
@@ -48,8 +47,7 @@ setup(
         classifiers=[
             ],
         keywords='lessweb web web.py',
-        #packages = ['lessweb', 'lessweb.plugin', 'lessweb-stubs'],
-        packages = ['lessweb', 'lessweb.plugin'],
+        packages = ['lessweb', 'lessweb.plugin', 'lessweb-stubs'],
         package_data={'lessweb-stubs': find_stub_files()},
         install_requires=['aiohttp', 'aiohttp_wsgi', 'requests', 'typing_inspect', 'typing_extensions'],
 

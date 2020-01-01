@@ -15,7 +15,7 @@ class TestLevelBottom(unittest.TestCase):
 
     def setUp(self) -> None:
         os.system("python web_002_level_middle.py &")
-        os.system("sleep 1")
+        os.system("sleep 2")
         self.down_cmd = requests.patch('http://localhost:8080/api/').text
 
     def test(self):

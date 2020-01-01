@@ -133,7 +133,7 @@ class Cookie:
         return ret
 
 
-def parse_cookie(http_cookie)->Dict[str, str]:
+def parse_cookie(http_cookie: str)->Dict[str, str]:
     """Parse from cookie header string to Dict"""
     cookie: SimpleCookie = SimpleCookie()
     try:
@@ -185,7 +185,7 @@ class NotFoundError(Exception):
         return 'Method Not Allowed' if self.methods else 'Not Found'
 
 
-def header_name_of_wsgi_key(wsgi_key):
+def header_name_of_wsgi_key(wsgi_key: str) -> str:
     """
     >>> header_name_of_wsgi_key('HTTP_ACCEPT_LANGUAGE')
     'Accept-Language'
@@ -200,7 +200,7 @@ def header_name_of_wsgi_key(wsgi_key):
         return ''
 
 
-def wsgi_key_of_header_name(header_name):
+def wsgi_key_of_header_name(header_name: str) -> str:
     """
     >>> wsgi_key_of_header_name('Accept-Language')
     'HTTP_ACCEPT_LANGUAGE'

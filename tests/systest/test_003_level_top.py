@@ -8,7 +8,7 @@ class TestLevelBottom(unittest.TestCase):
 
     def setUp(self) -> None:
         os.system("python web_003_level_top.py &")
-        os.system("sleep 1")
+        os.system("sleep 2")
         self.down_cmd = requests.patch('http://localhost:8080/').text
 
     def test(self):

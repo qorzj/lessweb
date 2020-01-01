@@ -78,7 +78,7 @@ def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_typ
         return Model(object)
 
 
-def fetch_param(ctx: Context, fn: Callable):
+def fetch_param(ctx: Context, fn: Callable) -> Dict[str, Any]:
     """
     fn: dealer function
     return: Dict[realname, Context|Request|Response|Model|...]
@@ -93,7 +93,7 @@ def fetch_param(ctx: Context, fn: Callable):
             result[realname] = ctx.request
         elif realtype == Response:
             result[realname] = ctx.response
-        elif issubclass(realtype, Service):
+        elif isinstance(realtype, type) and issubclass(realtype, Service):
             result[realname] = fetch_service(ctx, realtype)
         elif is_generic_type(realtype):
             if get_origin(realtype) == Model:

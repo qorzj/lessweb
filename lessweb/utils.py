@@ -1,4 +1,4 @@
-from typing import Any, Tuple, Dict, Type, get_type_hints
+from typing import Any, Tuple, Dict, Type, get_type_hints, Callable
 from contextlib import contextmanager
 import json
 from pathlib import Path
@@ -10,7 +10,7 @@ import inspect
 __all__ = ["eafp", "_nil", "re_standardize", "func_arg_spec", "makedir"]
 
 
-def eafp(ask, default):
+def eafp(ask: Callable, default: Any) -> Any:
     """
     Easier to ask for forgiveness than permission
     `x = eafp(lambda: int('a'), 0)` is equivalent to `x = int('a') ?? 0`
@@ -35,7 +35,7 @@ class Nil:
 _nil = Nil(0)
 
 
-def re_standardize(pattern):
+def re_standardize(pattern: str) -> str:
     """
         >>> pattern = re_standardize('/add/{x}/{y}')
         >>> pattern
@@ -61,7 +61,7 @@ def re_standardize(pattern):
     return re.sub(r'\{([^0-9].*?)\}', _repl, pattern)
 
 
-def func_arg_spec(fn) -> Dict[str, Tuple[Type, bool]]:
+def func_arg_spec(fn: Any) -> Dict[str, Tuple[Type, bool]]:
     arg_spec = {}  # name: (type_, has_default)
     inspect_ret = inspect.getfullargspec(fn)
     annotations = get_type_hints(fn)
@@ -73,5 +73,5 @@ def func_arg_spec(fn) -> Dict[str, Tuple[Type, bool]]:
     return arg_spec
 
 
-def makedir(real_path):
+def makedir(real_path: str) -> None:
     Path(real_path).mkdir(parents=True, exist_ok=True)

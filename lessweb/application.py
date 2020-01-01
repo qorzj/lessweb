@@ -96,7 +96,6 @@ class Application(object):
         self.response_bridges: List[Callable] = []
         self.encoding: str = encoding
         self.plugins: List[PluginProto] = []
-        self.config: Dict = {}
 
     def _handle_with_dealers(self, ctx: Context):
         def _1_mapping_match():
@@ -130,7 +129,7 @@ class Application(object):
                 ctx.response.set_status(HttpStatus.NotFound)
             return repr(e)
 
-    def add_interceptor(self, pattern, method, dealer):
+    def add_interceptor(self, pattern: str, method: str, dealer: Callable):
         """
         Example:
 
@@ -142,7 +141,7 @@ class Application(object):
         """
         assert isinstance(pattern, str), 'pattern:[{}] should be RegExp str'.format(pattern)
         method = method.upper()
-        assert method == '*' or method in http_methods, 'Method:[{}] should be one of {}'.format(method, ['*'] + http_methods)
+        assert method == '*' or method in http_methods, 'Method:[{}] should be * or one of {}'.format(method, http_methods)
         patternobj = re.compile(re_standardize(pattern))
         self.interceptors.insert(0, Interceptor(pattern, method, dealer, patternobj))
 
@@ -152,7 +151,7 @@ class Application(object):
     def add_response_bridge(self, bridge_func: ResponseBridgeFunc):
         self.response_bridges.append(bridge_func)
 
-    def add_mapping(self, pattern, method, dealer):
+    def add_mapping(self, pattern: str, method: str, dealer: Callable):
         """
         Example:
 
@@ -165,7 +164,7 @@ class Application(object):
         """
         assert isinstance(pattern, str), 'pattern:[{}] should be RegExp str'.format(pattern)
         method = method.upper()
-        assert method == '*' or method in http_methods, 'Method:[{}] should be one of {}'.format(method, ['*'] + http_methods)
+        assert method == '*' or method in http_methods, 'Method:[{}] should be * or one of {}'.format(method, http_methods)
         patternobj = re.compile(re_standardize(pattern))
         self.mapping.append(Mapping(pattern, method, dealer, '', patternobj))
 
@@ -176,52 +175,52 @@ class Application(object):
         "def add_{m}_mapping(self, pattern, dealer, view=None): return self.add_mapping(pattern, '{M}', dealer, view)\n")
         .format(m=m.lower(), M=m))
     """
-    def add_connect_interceptor(self, pattern, dealer):
+    def add_connect_interceptor(self, pattern: str, dealer: Callable):
         return self.add_interceptor(pattern, 'CONNECT', dealer)
 
-    def add_connect_mapping(self, pattern, dealer):
+    def add_connect_mapping(self, pattern: str, dealer: Callable):
         return self.add_mapping(pattern, 'CONNECT', dealer)
 
-    def add_delete_interceptor(self, pattern, dealer):
+    def add_delete_interceptor(self, pattern: str, dealer: Callable):
         return self.add_interceptor(pattern, 'DELETE', dealer)
 
-    def add_delete_mapping(self, pattern, dealer):
+    def add_delete_mapping(self, pattern: str, dealer: Callable):
         return self.add_mapping(pattern, 'DELETE', dealer)
 
-    def add_get_interceptor(self, pattern, dealer):
+    def add_get_interceptor(self, pattern: str, dealer: Callable):
         return self.add_interceptor(pattern, 'GET', dealer)
 
-    def add_get_mapping(self, pattern, dealer):
+    def add_get_mapping(self, pattern: str, dealer: Callable):
         return self.add_mapping(pattern, 'GET', dealer)
 
-    def add_head_interceptor(self, pattern, dealer):
+    def add_head_interceptor(self, pattern: str, dealer: Callable):
         return self.add_interceptor(pattern, 'HEAD', dealer)
 
-    def add_head_mapping(self, pattern, dealer):
+    def add_head_mapping(self, pattern: str, dealer: Callable):
         return self.add_mapping(pattern, 'HEAD', dealer)
 
-    def add_options_interceptor(self, pattern, dealer):
+    def add_options_interceptor(self, pattern: str, dealer: Callable):
         return self.add_interceptor(pattern, 'OPTIONS', dealer)
 
-    def add_options_mapping(self, pattern, dealer):
+    def add_options_mapping(self, pattern: str, dealer: Callable):
         return self.add_mapping(pattern, 'OPTIONS', dealer)
 
-    def add_patch_interceptor(self, pattern, dealer):
+    def add_patch_interceptor(self, pattern: str, dealer: Callable):
         return self.add_interceptor(pattern, 'PATCH', dealer)
 
-    def add_patch_mapping(self, pattern, dealer):
+    def add_patch_mapping(self, pattern: str, dealer: Callable):
         return self.add_mapping(pattern, 'PATCH', dealer)
 
-    def add_post_interceptor(self, pattern, dealer):
+    def add_post_interceptor(self, pattern: str, dealer: Callable):
         return self.add_interceptor(pattern, 'POST', dealer)
 
-    def add_post_mapping(self, pattern, dealer):
+    def add_post_mapping(self, pattern: str, dealer: Callable):
         return self.add_mapping(pattern, 'POST', dealer)
 
-    def add_put_interceptor(self, pattern, dealer):
+    def add_put_interceptor(self, pattern: str, dealer: Callable):
         return self.add_interceptor(pattern, 'PUT', dealer)
 
-    def add_put_mapping(self, pattern, dealer):
+    def add_put_mapping(self, pattern: str, dealer: Callable):
         return self.add_mapping(pattern, 'PUT', dealer)
 
     def add_plugin(self, plugin: PluginProto):
@@ -303,7 +302,7 @@ class Application(object):
 
         return wsgi
 
-    def run(self, wsgifunc=None, port:int=8080, homepath='', staticpath='static'):
+    def run(self, wsgifunc=None, port:int=8080, homepath:str='', staticpath:str='static'):
         """
         Example:
 

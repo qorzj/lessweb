@@ -1,3 +1,4 @@
+from typing import Iterable
 from enum import Enum
 from redis import Redis, ConnectionPool
 
@@ -14,7 +15,7 @@ class RedisKey(Enum):
 
 
 class RedisPlugin:
-    def __init__(self, host, port=6379, db=0, patterns=('.*',)):
+    def __init__(self, host: str, port: int=6379, db: int=0, patterns: Iterable[str]=('.*',)):
         self.redis_pool = ConnectionPool(host=host, port=port, db=db)
         self.patterns = patterns
 
@@ -22,7 +23,7 @@ class RedisPlugin:
         ctx.box[RedisKey.session] = Redis(connection_pool=self.redis_pool)
         return ctx()
 
-    def init_app(self, app: Application):
+    def init_app(self, app: Application) -> None:
         for pattern in self.patterns:
             segs = pattern.split()
             if len(segs) == 1:
@@ -30,7 +31,7 @@ class RedisPlugin:
             elif len(segs) == 2:
                 app.add_interceptor(segs[1], method=segs[0], dealer=self.processor)
 
-    def teardown(self, exception: Exception):
+    def teardown(self, exception: Exception) -> None:
         pass
 
 
