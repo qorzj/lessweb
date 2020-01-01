@@ -53,16 +53,7 @@ def fetch_service(ctx: Context, service_type: Type):
 
 def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_type: Type):
     """
-        >>> from lessweb.storage import Storage
-        >>> class Person(Model):
-        ...     name: str
-        ...     age: int
-        ...     weight: int
-        >>> ctx = Context()
-        >>> ctx.set_alias('weight', 'w')
-        >>> ctx._fields = dict(name='Bob', age='33', w='100', x='1')
-        >>> model = fetch_model(ctx, Person)
-        >>> assert Storage.of(model) == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
+    return: origin_type[core_type]
     """
     fields = {}
     for realname, realtype in get_type_hints(core_type).items():
@@ -89,13 +80,8 @@ def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_typ
 
 def fetch_param(ctx: Context, fn: Callable):
     """
-        >>> def get_person(ctx:Context, name:str, age:int, weight:int, createAt:int=2):
-        ...     pass
-        >>> ctx = Context()
-        >>> ctx.request.set_alias('weight', 'w')
-        >>> ctx._fields = dict(name='Bob', age='33', w='100', weight='1', createAt='9')
-        >>> param = fetch_param(ctx, get_person)
-        >>> assert param == {'ctx': ctx, 'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
+    fn: dealer function
+    return: Dict[realname, Context|Request|Response|Model|...]
     """
     result: Dict[str, Any] = {}
     bridge = RequestBridge(ctx.app.request_bridges)

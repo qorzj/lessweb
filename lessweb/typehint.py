@@ -8,12 +8,6 @@ __all__ = ["optional_core", "generic_core", "is_optional_type", "is_generic_type
 def optional_core(t):
     """
     t is Optaional? t.core : NoneType
-    >>> optional_core(List[int])
-    <class 'NoneType'>
-    >>> optional_core(Optional[str])
-    <class 'str'>
-    >>> optional_core(Union[int, str])
-    <class 'NoneType'>
     """
     if is_optional_type(t) and t is not None.__class__:
         first, second = get_args(t)

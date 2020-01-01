@@ -40,7 +40,6 @@ def re_standardize(pattern):
         >>> pattern = re_standardize('/add/{x}/{y}')
         >>> pattern
         '^/add/(?P<x>[^/]+)/(?P<y>[^/]+)$'
-
         >>> re.search(pattern, '/add/234/5').groupdict()
         {'x': '234', 'y': '5'}
         >>> re.search(pattern, '/add//add') is None

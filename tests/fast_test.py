@@ -12,6 +12,10 @@ class FastTest(TestCase):
     def testMypy(self):
         self.assertEqual(0, system("mypy lessweb"))
 
+    def testDocTest(self):
+        # doctest适用于测试简单的、直观的方法
+        self.assertEqual(0, system("nosetests -s --with-doctest lessweb"))
+
     def testUT(self):
         self.assertEqual(0, system("nosetests -s tests/ut"))
 
