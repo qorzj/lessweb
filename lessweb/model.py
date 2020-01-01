@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Type, get_type_hints, TypeVar, Generic
+from typing import Callable, Optional, Type, get_type_hints, TypeVar, Generic, Dict, Any
 from abc import ABCMeta
 
 from .context import Context, Request, Response
@@ -33,7 +33,7 @@ class Service(metaclass=ABCMeta):
 
 def fetch_service(ctx: Context, service_type: Type):
     self_flag = True
-    params = {}
+    params: Dict[str, Any] = {}
     for realname, (realtype, _) in func_arg_spec(service_type.__init__).items():
         if self_flag or realname == 'return':
             self_flag = False
@@ -97,7 +97,7 @@ def fetch_param(ctx: Context, fn: Callable):
         >>> param = fetch_param(ctx, get_person)
         >>> assert param == {'ctx': ctx, 'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
     """
-    result = {}
+    result: Dict[str, Any] = {}
     bridge = RequestBridge(ctx.app.request_bridges)
     for realname, (realtype, has_default) in func_arg_spec(fn).items():
         if realname == 'return': continue

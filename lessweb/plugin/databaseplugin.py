@@ -87,7 +87,10 @@ class DbServ(Service):
 
     def __init__(self, ctx: Context):
         self.ctx = ctx
-        self.db = ctx.box.get(DatabaseKey.session)
+        session = ctx.box.get(DatabaseKey.session)
+        if session is None:
+            raise ValueError('database session not available')
+        self.db = session
 
 
 T = TypeVar('T')
@@ -98,7 +101,7 @@ def cast_model(model_class: Type[T], query_result) -> T:
     model_object = model_class()
     model_keys = get_type_hints(model_class)
     if query_result is None:
-        return None
+        return model_object
 
     if hasattr(query_result, '__table__'):  # 单个对象
         for key in query_result.__table__.columns.keys():

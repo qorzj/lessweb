@@ -5,7 +5,6 @@ Web application
 from datetime import datetime
 import itertools
 import json
-import json5
 import logging
 import os
 import re
@@ -20,6 +19,7 @@ from .model import fetch_param
 from .storage import Storage
 from .utils import eafp, re_standardize, makedir
 from .bridge import RequestBridge, make_response_encoder, RequestBridgeFunc, ResponseBridgeFunc
+from .pluginproto import PluginProto
 
 
 __all__ = [
@@ -51,13 +51,6 @@ class Mapping:
 def build_controller(dealer):
     """
     把接收多个参数的dealer转变成只接收一个参数(ctx)的函数
-
-        >>> def controller(ctx:Context, id:int, lpn):
-        ...     return {'ctx': ctx, 'id': id, 'lpn': lpn}
-        >>> ctx = Context()
-        >>> ctx._fields = dict(id='5', lpn='HK888', pageNo='3')
-        >>> ret = build_controller(controller)(ctx)
-        >>> assert ret == {'ctx': ctx, 'id': 5, 'lpn': 'HK888'}, ret
     """
     def _1_controller(ctx:Context):
         params = fetch_param(ctx, dealer)
@@ -70,17 +63,6 @@ def interceptor(dealer):
     """
     为controller添加interceptor的decorator
     在dealer函数中调用ctx()，就会执行它修饰的controller
-
-        >>> def dealer(ctx:Context, id:int, pageNo:int):
-        ...     assert id == 5 and pageNo == 3, (id, pageNo)
-        ...     return list(ctx())
-        >>> @interceptor(dealer)
-        ... def controller(ctx:Context, id:int, lpn):
-        ...     return {'ctx': ctx, 'id': id, 'lpn': lpn}
-        >>> ctx = Context()
-        >>> ctx._fields = dict(id='5', lpn='HK888', pageNo='3')
-        >>> ret = build_controller(controller)(ctx)
-        >>> assert list(ret) == ['ctx', 'id', 'lpn'], ret
     """
     def _1_wrapper(fn):
         def _1_1_controller(ctx:Context):
@@ -107,15 +89,14 @@ class Application(object):
         app.run(port=8080)
 
     """
-    def __init__(self, encoding:str='utf-8', config:str=None) -> None:
+    def __init__(self, encoding:str='utf-8') -> None:
         self.mapping: List[Mapping] = []
         self.interceptors: List[Interceptor] = []
         self.request_bridges: List[Callable] = []
         self.response_bridges: List[Callable] = []
         self.encoding: str = encoding
+        self.plugins: List[PluginProto] = []
         self.config: Dict = {}
-        if config is not None:
-            self.config.update(json5.loads(open(config).read()))
 
     def _handle_with_dealers(self, ctx: Context):
         def _1_mapping_match():
@@ -243,6 +224,10 @@ class Application(object):
     def add_put_mapping(self, pattern, dealer):
         return self.add_mapping(pattern, 'PUT', dealer)
 
+    def add_plugin(self, plugin: PluginProto):
+        self.plugins.append(plugin)
+        plugin.init_app(self)
+
     def wsgifunc(self, *middleware):
         """
             Example:
@@ -329,7 +314,7 @@ class Application(object):
             app.run(port=80, homepath='/api')
         """
         from aiohttp import web
-        from aiohttp_wsgi import WSGIHandler
+        from aiohttp_wsgi import WSGIHandler  # type: ignore
         app = web.Application()
         if wsgifunc is None:
             wsgifunc = self.wsgifunc()

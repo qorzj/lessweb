@@ -135,7 +135,7 @@ class Cookie:
 
 def parse_cookie(http_cookie)->Dict[str, str]:
     """Parse from cookie header string to Dict"""
-    cookie = SimpleCookie()
+    cookie: SimpleCookie = SimpleCookie()
     try:
         cookie.load(http_cookie)
     except CookieError:

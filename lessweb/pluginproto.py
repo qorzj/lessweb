@@ -2,7 +2,7 @@ from typing import Any
 try:
     from typing import Protocol  # since python3.8+
 except ImportError:
-    from typing_extensions import Protocol
+    from typing_extensions import Protocol  # type: ignore
 
 
 __all__ = ["PluginProto"]

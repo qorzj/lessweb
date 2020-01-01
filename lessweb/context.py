@@ -150,6 +150,7 @@ class Request:
             # 此处使用cache不只是为了性能，更重要的是cgi不保证重名参数的顺序，如果每次得到的结果可能不同，会导致安全性漏洞
             return self._params[key]
         param = self.param_input
+        ret: Optional[Union[ParamStr, Jsonizable]]
         if key in param.url_input:
             self._params[key] = ret = param.url_input[key]
         elif key in param.form_input:  # must in front of query_input
@@ -170,7 +171,7 @@ class Response:
     def __init__(self, encoding: str):
         self._cookies: Dict[str, Cookie] = {}
         self._status: Union[HttpStatus, ResponseStatus] = HttpStatus.OK
-        self._headers = CaseInsensitiveDict()
+        self._headers: CaseInsensitiveDict = CaseInsensitiveDict()
         self.encoding: str = encoding
 
     def set_cookie(self, name:str, value:str, expires:int=None, path:str='/',
@@ -190,14 +191,17 @@ class Response:
         return self._status
 
     def set_header(self, name: str, value: Union[str, int]) -> None:
-        if '\n' in name or '\r' in name or '\n' in value or '\r' in value:
+        if isinstance(value, int):
+            self._headers[name] = str(value)
+        elif '\n' in name or '\r' in name or '\n' in value or '\r' in value:
             raise ValueError('invalid characters in header')
-        self._headers[name] = str(value)
+        else:
+            self._headers[name] = value
 
     def get_header(self, name: str) -> Optional[str]:
         return self._headers.get(name)
 
-    def del_header(self, name: str) -> None:
+    def del_header(self, name: str) -> str:
         return self._headers.pop(name, None)
 
     def get_headernames(self) -> List[str]:

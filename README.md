@@ -26,8 +26,9 @@ app.run()
 ```bash
 virtualenv venv
 bash pre_test.sh
-nosetests -s fast_test.py
-nosetests -s slow_test.py
-nosetests -s final_test.py
+. venv/bin/activate
+nosetests -s tests/fast_test.py
+nosetests -s tests/slow_test.py
+nosetests -s tests/final_test.py
 
 ```

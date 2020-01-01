@@ -40,4 +40,7 @@ class RedisServ(Service):
 
     def __init__(self, ctx: Context):
         self.ctx = ctx
-        self.redis = ctx.box.get(RedisKey.session)
+        session = ctx.box.get(RedisKey.session)
+        if session is None:
+            raise ValueError('redis session not available')
+        self.redis = session

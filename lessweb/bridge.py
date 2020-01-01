@@ -30,7 +30,7 @@ class MultipartFile:
         self.value = upfile.value
 
     def __str__(self) -> str:
-        return f'<MultipartFile filename={self.filename} value={self.value}>'
+        return f'<MultipartFile filename={self.filename} value={str(self.value)}>'
 
 
 RequestBridgeFunc = Callable[[Union[ParamStr, Jsonizable], Type], Any]
@@ -42,6 +42,8 @@ def default_request_bridge(inputval: Union[ParamStr, Jsonizable], real_type: Typ
         if inputval == '✓': return True
         if inputval == '✗': return False
     if issubclass(real_type, int):
+        if isinstance(inputval, Dict) or isinstance(inputval, List) or inputval is None:
+            raise ValueError("invalid input value for int(): '%s'" % inputval)
         n = int(inputval)
         if real_type == uint and n < 0:
             raise ValueError("invalid range for uint(): '%s'" % n)
@@ -57,6 +59,7 @@ def default_response_bridge(obj: Any) -> Jsonizable:
         return obj.isoformat()
     if isinstance(obj, Enum):
         return obj.value
+    return None
 
 
 class RequestBridge:
