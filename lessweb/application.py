@@ -263,7 +263,7 @@ class Application(object):
                     if not isinstance(resp, (bytes, str)) and resp is not None:
                         if not resp_content_type or \
                                 (resp_content_type and 'json' in resp_content_type.lower()):
-                            resp = json.dumps(resp, cls=make_response_encoder(self.response_bridges))
+                            resp = json.dumps(resp, ensure_ascii=False, cls=make_response_encoder(self.response_bridges))
                             mimekey = 'json'
                         else:
                             resp = str(resp)
