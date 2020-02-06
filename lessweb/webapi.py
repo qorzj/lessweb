@@ -1,5 +1,15 @@
+from typing import Optional, Dict, List
+import cgi
+from io import BytesIO
 from http.cookies import Morsel, SimpleCookie, CookieError
-from urllib.parse import unquote, quote
+from urllib.parse import parse_qs, unquote
+from enum import Enum
+from typing import NamedTuple
+from .bridge import ParamStr, MultipartFile
+
+
+__all__ = ["mimetypes", "hop_by_hop_headers", "http_methods", "ParamInput", "ResponseStatus", "HttpStatus",
+           "Cookie", "parse_cookie", "NeedParamError", "BadParamError", "NotFoundError"]
 
 
 mimetypes = {
@@ -21,189 +31,111 @@ http_methods = (
     'GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH',
 )
 
-status_table = {
-    200: 'OK',
-    201: 'Created',
-    202: 'Accepted',
-    204: 'No Content',
-    301: 'Moved Permanently',
-    302: 'Found',
-    303: 'See Other',
-    304: 'Not Modified',
-    307: 'Temporary Redirect',
-    400: 'Bad Request',
-    401: 'Unauthorized',
-    403: 'Forbidden',
-    404: 'Not Found',
-    405: 'Method Not Allowed',
-    406: 'Not Acceptable',
-    409: 'Conflict',
-    410: 'Gone',
-    412: 'Precondition Failed',
-    415: 'Unsupported Media Type',
-    422: 'Unprocessable Entity',
-    451: 'Unavailable For Legal Reasons',
-    500: 'Internal Server Error',
-}
 
-
-class UploadedFile:
-    def __init__(self, upfile):
-        self.filename = upfile.filename
-        self.value = upfile.value
-
-
-# HTTPError and subclasses
-class HttpError(Exception):
-    def __init__(self, *, status_code, text, headers=None):
-        self.status_code: int = status_code
-        self.text: str = text
-        self.headers = headers or []
-
-    @property
-    def reason(self):
-        return status_table.get(self.status_code, 'Other Error')
-
-
-class _Redirect(HttpError):
-    def __init__(self, status_code, fullurl, headers):
-        headers = headers or []
-        set_header(headers, 'Content-Type', 'text/html', setdefault=True)
-        set_header(headers, 'Location', fullurl, setdefault=True)
-        super().__init__(status_code=status_code, text='', headers=headers)
-
-
-class MovedPermanently(_Redirect):
-    def __init__(self, url, headers=None):
-        headers = headers or []
-        super().__init__(status_code=301, fullurl=url, headers=headers)
-
-
-class Found(_Redirect):
-    def __init__(self, url, headers=None):
-        headers = headers or []
-        super().__init__(status_code=302, fullurl=url, headers=headers)
-
-
-class SeeOther(_Redirect):
-    def __init__(self, url, headers=None):
-        headers = headers or []
-        super().__init__(status_code=303, fullurl=url, headers=headers)
-
-
-class NotModified(HttpError):
+class ParamInput:
     def __init__(self):
-        super().__init__(status_code=304, text='')
+        self.url_input: Dict[str, ParamStr] = {}  # Input from URL
+        self.query_input: Dict[str, List[ParamStr]] = {}  # Input from Query
+        self.form_input: Dict[str, List[ParamStr]] = {}  # Input from Form. form_input contains query_input
+
+    def load_query(self, query: str, encoding: str) -> None:
+        if query and query[0] == '?':
+            query = query[1:]
+        parse_ret = parse_qs(query, keep_blank_values=True, encoding=encoding)
+        for key, vals in parse_ret.items():
+            self.query_input.setdefault(key, [])
+            self.query_input[key].extend(ParamStr(val) for val in vals)
+
+    def load_form(self, body: bytes, env: Dict, encoding: str, file_input: Dict[str, List[MultipartFile]]) -> None:
+        parse_ret = cgi.FieldStorage(fp=BytesIO(body), environ=env.copy(), keep_blank_values=1, encoding=encoding)
+        if parse_ret.list is None: # hack to make input work with enctype='text/plain.
+            parse_ret.list = []
+        for key in parse_ret.keys():
+            val = parse_ret[key]
+            for item in (val if isinstance(val, list) else [val]):
+                if item.filename is None:  # 非文件
+                    self.form_input.setdefault(key, [])
+                    self.form_input[key].append(ParamStr(item.value))
+                else:  # 文件
+                    file_input.setdefault(key, [])
+                    file_input[key].append(MultipartFile(item))
+
+    def load_url(self, groupdict: Dict) -> None:
+        for key, val in groupdict.items():
+            self.url_input[key] = ParamStr(val)
 
 
-class TempRedirect(_Redirect):
-    def __init__(self, url, headers=None):
-        super().__init__(status_code=307, fullurl=url, headers=headers)
+class ResponseStatus(NamedTuple):
+    code: int
+    reason: str
 
 
-class _TextHttpError(HttpError):
-    def __init__(self, status_code, text, headers):
-        headers = headers or []
-        set_header(headers, 'Content-Type', 'text/html', setdefault=True)
-        super().__init__(status_code=status_code, text=text, headers=headers)
+class HttpStatus(Enum):
+    @staticmethod
+    def of(code: int) -> 'HttpStatus':
+        for status in HttpStatus:
+            if status.value.code == code:
+                return status
+        raise NotImplementedError(f'HTTP status {code} is not implemented.')
+
+    OK = ResponseStatus(code=200, reason='OK')
+    Created = ResponseStatus(code=201, reason='Created')
+    Accepted = ResponseStatus(code=202, reason='Accepted')
+    NoContent = ResponseStatus(code=204, reason='No Content')
+    MovedPermanently = ResponseStatus(code=301, reason='Moved Permanently')
+    Found = ResponseStatus(code=302, reason='Found')
+    SeeOther = ResponseStatus(code=303, reason='See Other')
+    NotModified = ResponseStatus(code=304, reason='Not Modified')
+    TemporaryRedirect = ResponseStatus(code=307, reason='Temporary Redirect')
+    BadRequest = ResponseStatus(code=400, reason='Bad Request')
+    Unauthorized = ResponseStatus(code=401, reason='Unauthorized')
+    Forbidden = ResponseStatus(code=403, reason='Forbidden')
+    NotFound = ResponseStatus(code=404, reason='Not Found')
+    MethodNotAllowed = ResponseStatus(code=405, reason='Method Not Allowed')
+    NotAcceptable = ResponseStatus(code=406, reason='Not Acceptable')
+    Conflict = ResponseStatus(code=409, reason='Conflict')
+    Gone = ResponseStatus(code=410, reason='Gone')
+    PreconditionFailed = ResponseStatus(code=412, reason='Precondition Failed')
+    UnsupportedMediaType = ResponseStatus(code=415, reason='Unsupported Media Type')
+    UnprocessableEntity = ResponseStatus(code=422, reason='Unprocessable Entity')
+    UnavailableForLegalReasons = ResponseStatus(code=451, reason='Unavailable For Legal Reasons')
+    InternalServerError = ResponseStatus(code=500, reason='Internal Server Error')
 
 
-class BadRequest(_TextHttpError):
-    def __init__(self, text, headers=None):
-        super().__init__(status_code=400, text=text, headers=headers)
+class Cookie:
+    name: str
+    value: str
+    expires: Optional[int]
+    path: str
+    domain: Optional[str]
+    secure: bool
+    httponly: bool
+
+    def __init__(self, name:str, value:str, expires:int=None, path:str='/',
+                 domain:str=None, secure:bool=False, httponly:bool=False):
+        self.name = name
+        self.value = value
+        self.expires = expires
+        self.path = path
+        self.domain = domain
+        self.secure = secure
+        self.httponly = httponly
+
+    def dumps(self):
+        morsel = Morsel()
+        morsel.set(self.name, self.value, self.value)
+        morsel['expires'] = '' if self.expires is None else self.expires
+        morsel['path'] = self.path
+        if self.domain: morsel['domain'] = self.domain
+        if self.secure: morsel['secure'] = self.secure
+        ret = morsel.OutputString()
+        if self.httponly: ret += '; httponly'
+        return ret
 
 
-class Unauthorized(_TextHttpError):
-    def __init__(self, text='unauthorized', headers=None):
-        super().__init__(status_code=401, text=text, headers=headers)
-
-
-class Forbidden(_TextHttpError):
-    def __init__(self, text="forbidden", headers=None):
-        super().__init__(status_code=403, text=text, headers=headers)
-
-
-class NotFound(HttpError):
-    def __init__(self, text, headers=None):
-        headers = headers or []
-        set_header(headers, 'Content-Type', 'text/html', setdefault=True)
-        super().__init__(status_code=404, text=text, headers=headers)
-
-
-class NoMethod(_TextHttpError):
-    def __init__(self, text='', methods=None and ['GET', ...], headers=None):
-        headers = headers or []
-        if methods:
-            set_header(headers, 'Allow', ', '.join(methods), setdefault=True)
-        super().__init__(status_code=405, text=text, headers=headers)
-
-
-class NotAcceptable(_TextHttpError):
-    def __init__(self, text='not acceptable', headers=None):
-        super().__init__(status_code=406, text=text, headers=headers)
-
-
-class Conflict(_TextHttpError):
-    def __init__(self, text='conflict', headers=None):
-        super().__init__(status_code=409, text=text, headers=headers)
-
-
-class Gone(_TextHttpError):
-    def __init__(self, text='gone', headers=None):
-        super().__init__(status_code=410, text=text, headers=headers)
-
-
-class PreconditionFailed(_TextHttpError):
-    def __init__(self, text='precondition failed', headers=None):
-        super().__init__(status_code=412, text=text, headers=headers)
-
-
-class UnsupportedMediaType(_TextHttpError):
-    def __init__(self, text='unsupported media type', headers=None):
-        super().__init__(status_code=415, text=text, headers=headers)
-
-
-class UnavailableForLegalReasons(_TextHttpError):
-    def __init__(self, text='unavailable for legal reasons', headers=None):
-        super().__init__(status_code=451, text=text, headers=headers)
-
-
-class InternalError(_TextHttpError):
-    def __init__(self, text='internal server error', headers=None):
-        super().__init__(status_code=500, text=text, headers=headers)
-
-
-def set_header(headers, key, value, multiple=False, setdefault=False):
-    assert isinstance(key, str) and isinstance(value, str)
-    if '\n' in key or '\r' in key or '\n' in value or '\r' in value:
-        raise ValueError('invalid characters in header')
-    if not multiple:
-        for idx, (k, v) in enumerate(headers):
-            if k.lower() == key.lower():
-                if not setdefault:
-                    headers[idx] = (key, value)
-                return
-    headers.append((key, value))
-
-
-def make_cookie(name, value, expires='', path='', domain=None, secure=False, httponly=False):
-    """Make a cookie string"""
-    morsel = Morsel()
-    morsel.set(name, value, quote(value))
-    if isinstance(expires, int) and expires < 0:
-        expires = -1000000000
-    morsel['expires'] = expires
-    morsel['path'] = path
-    if domain: morsel['domain'] = domain
-    if secure: morsel['secure'] = secure
-    value = morsel.OutputString()
-    if httponly: value += '; httponly'
-    return value
-
-
-def parse_cookie(http_cookie):
+def parse_cookie(http_cookie: str)->Dict[str, str]:
     """Parse from cookie header string to Dict"""
-    cookie = SimpleCookie()
+    cookie: SimpleCookie = SimpleCookie()
     try:
         cookie.load(http_cookie)
     except CookieError:
@@ -213,7 +145,7 @@ def parse_cookie(http_cookie):
                 cookie.load(attr_value)
             except CookieError:
                 pass
-    cookies = dict([(k, unquote(v.value)) for k, v in cookie.items()])
+    cookies = dict([(k, v.value) for k, v in cookie.items()])
     return cookies
 
 
@@ -240,3 +172,40 @@ class BadParamError(Exception):
 
     def __str__(self):
         return 'query:%s error:%s' % (self.query, self.error)
+
+
+class NotFoundError(Exception):
+    def __init__(self, methods=None):
+        self.methods = methods or []
+
+    def __repr__(self):
+        return 'Method Not Allowed' if self.methods else 'Not Found'
+
+    def __str__(self):
+        return 'Method Not Allowed' if self.methods else 'Not Found'
+
+
+def header_name_of_wsgi_key(wsgi_key: str) -> str:
+    """
+    >>> header_name_of_wsgi_key('HTTP_ACCEPT_LANGUAGE')
+    'Accept-Language'
+    >>> header_name_of_wsgi_key('HTTP_AUTHORIZATION')
+    'Authorization'
+
+    """
+    if wsgi_key.startswith('HTTP_'):
+        words_for_short = {'IM', 'HTTP2', 'MD5', 'TE', 'DNT', 'ATT', 'UIDH', 'XSS'}
+        return '-'.join((s if s in words_for_short else s.capitalize()) for s in wsgi_key[5:].split('_'))
+    else:
+        return ''
+
+
+def wsgi_key_of_header_name(header_name: str) -> str:
+    """
+    >>> wsgi_key_of_header_name('Accept-Language')
+    'HTTP_ACCEPT_LANGUAGE'
+    >>> wsgi_key_of_header_name('Authorization')
+    'HTTP_AUTHORIZATION'
+
+    """
+    return 'HTTP_' + header_name.replace('-', '_').upper()

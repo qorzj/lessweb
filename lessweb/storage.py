@@ -1,3 +1,8 @@
+from typing import get_type_hints
+
+
+__all__ = ["Storage"]
+
 
 class Storage(dict):
     """
@@ -18,7 +23,6 @@ class Storage(dict):
             ...
         AttributeError: 'a'
     """
-
     def __getattr__(self, key):
         try:
             return self[key]
@@ -46,3 +50,10 @@ class Storage(dict):
                 self.__sub__(key)
         return self
 
+    @staticmethod
+    def of(obj):
+        result = Storage()
+        for name in get_type_hints(obj).keys():
+            if name[0] != '_' and hasattr(obj, name):
+                result[name] = getattr(obj, name)
+        return result

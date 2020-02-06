@@ -90,3 +90,5 @@ ENV/
 
 .idea
 .DS_Store
+.mypy_cache
+__target__/

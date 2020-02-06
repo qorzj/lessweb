@@ -21,3 +21,14 @@ app.run()
 
 ## 文档：
 ### http://lessweb.org
+
+## 本地测试步骤：
+```bash
+virtualenv venv
+bash pre_test.sh
+. venv/bin/activate
+nosetests -s tests/fast_test.py
+nosetests -s tests/slow_test.py
+nosetests -s tests/final_test.py
+
+```

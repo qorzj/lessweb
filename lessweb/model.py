@@ -1,239 +1,118 @@
-import inspect
-import functools
-from enum import Enum
-from inspect import _empty
-from typing import *
+from typing import Callable, Optional, Type, get_type_hints, TypeVar, Generic, Dict, Any
+from abc import ABCMeta
 
-from lessweb.context import Context
-from lessweb.utils import _nil, _readonly, Service
-from lessweb.webapi import NeedParamError, BadParamError
-from lessweb.storage import Storage
-
-
-class Jsonable:
-    def jsonize(self):
-        return str(self)
+from .context import Context, Request, Response
+from .webapi import NeedParamError, BadParamError
+from .bridge import Jsonizable, MultipartFile
+from .typehint import optional_core, generic_core, is_optional_type, is_generic_type, get_origin
+from .utils import func_arg_spec
+from .storage import Storage
+from .bridge import RequestBridge
 
 
-class RestParam(Jsonable):
-    def eval_from_text(self, text):
-        return
-
-    def eval_from_json(self, obj):
-        return
+__all__ = ["Model", "Service"]
 
 
-class PagedList(Jsonable):
-    pageNo: int = 1
-    pageSize: int = 1
-    totalNum: int = 0
-    list: List = None
-
-    @property
-    def totalPage(self):
-        d, m = divmod(self.totalNum, self.pageSize)
-        return max(1, d) if m == 0 else d + 1
-
-    def __init__(self):
-        self.list = []
-
-    def jsonize(self):
-        return {
-            'list': self.list, 'pageNo': self.pageNo, 'pageSize': self.pageSize,
-            'totalNum': self.totalNum, 'totalPage': self.totalPage
-        }
+T = TypeVar('T')
 
 
-def get_func_parameters(func):
+class Model(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value: T = value
+
+    def get(self) -> T:
+        return self.value
+
+    def __str__(self):
+        return f'lessweb.Model[{type(self.value)}]'
+
+
+class Service(metaclass=ABCMeta):
+    pass
+
+
+def fetch_service(ctx: Context, service_type: Type):
+    self_flag = True
+    params: Dict[str, Any] = {}
+    for realname, (realtype, _) in func_arg_spec(service_type.__init__).items():
+        if self_flag or realname == 'return':
+            self_flag = False
+        elif realtype == Context:
+            params[realname] = ctx
+        elif realtype == Request:
+            params[realname] = ctx.request
+        elif realtype == Response:
+            params[realname] = ctx.response
+        elif isinstance(realtype, type) and realtype != service_type \
+                and issubclass(realtype, Service):
+            params[realname] = fetch_service(ctx, realtype)
+        else:
+            raise KeyError('%s.__init__(%s) param type is empty or wrong!' % (str(service_type), realname))
+    return service_type(**params)
+
+
+def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_type: Type):
     """
-    >>> def f(a:int, b=4)->int:
-    ...   return a+b
-    >>> ret = get_func_parameters(f)
-    >>> assert ret == [('a', int, _nil), ('b', _nil, 4)]
+    return: origin_type[core_type]
     """
-    return [
-        (
-            p,
-            _nil if q.annotation is _empty else q.annotation ,
-            _nil if q.default is _empty else q.default,
-        )
-        for p, q in inspect.signature(func).parameters.items()
-    ]
-
-
-def get_annotations(x):
-    return getattr(x, '__annotations__', {})
-
-
-def get_model_parameters(cls):
-    """get_model_parameters(Class) -> [(realname, Type, default), ...]"""
-    annos = get_annotations(cls)
-    inst = cls()
-    defaults = {
-        k: getattr(inst, k, _nil) for k in cls.__dict__
-    }
-    for k in cls.__dict__:  # handle read-only property
-        if isinstance(getattr(cls, k), property) and not getattr(cls, k).fset:
-            defaults[k] = _readonly
-
-    return [
-        (k, annos.get(k, _nil), defaults.get(k, _nil))  # (realname, Type, default)
-        for k in
-        (lambda x, y: x.update(y) or x)(annos.copy(), defaults)
-        if k[0] != '_'
-    ]
-
-
-class Model:
-    def storage(self):
-        return Storage({
-            k: getattr(self, k) for k, _, _
-            in get_model_parameters(type(self))
-            if hasattr(self, k)
-        })
-
-    def setall(self, *mapping, **kwargs):
-        if mapping:
-            self.setall(**mapping[0])
-        for k, v in kwargs.items():
-            if k[0] != '_':
-                try:
-                    setattr(self, k, v)
-                except AttributeError:  # property without setter
-                    pass
-
-    def copy(self, *mapping, **kwargs):
-        ret = self.__class__()
-        ret.setall(**self.storage())
-        if mapping:
-            ret.setall(**mapping[0])
-        ret.setall(**kwargs)
-        return ret
-
-    def __eq__(self, other):
-        return self is other or (type(self) == type(other) and self.storage() == other.storage())
-
-    def __repr__(self):
-        if type(self) is Model:
-            return super().__repr__()
-        return '<Model ' + repr(dict(self.storage())) + '>'
-
-
-def input_by_choose(ctx: Context, fn, realname, realtype, default):
-    """
-
-        >>> def foo(a, b, c=0, d=1, e=2):
-        ...     pass
-        >>> ctx = Context()
-        >>> ctx._fields = dict(a='A', b='B', c='C', d='D', e='E', f='F')
-        >>> ctx.querynames = 'a,b,c'
-        >>> [input_by_choose(ctx, foo, k, realtype=str, default=None) for k in 'abcde']
-        ['A', 'B', 'C', None, None]
-    """
-    queryname = ctx.aliases.get(realname, realname)
-
-    if realname in ctx._pipe:
-        value = ctx.get_param(realname)
-    else:
-        pre_value = ctx.get_input(queryname, default=_nil)
-        try:
-            if pre_value != _nil:
-                if not isinstance(realtype, type):
-                    value = realtype(pre_value)
-                elif not issubclass(realtype, RestParam):
-                    if realtype is int:
-                        value = max(int(pre_value), 0)
-                    elif issubclass(realtype, Enum):
-                        def _eval_enum(x, T):
-                            for e in T.__members__.values():
-                                if str(e.value) == str(x):
-                                    return e
-                            raise ValueError("%r is not a valid %s" % (x, T.__name__))
-
-                        value = _eval_enum(pre_value, realtype)
-                    else:
-                        value = realtype(pre_value)
-                else:  # realtype is subclass of RestParam
-                    value = realtype()
-                    if ctx.is_json_request():
-                        if hasattr(value, 'lessweb_eval_from_json'):
-                            value.lessweb_eval_from_json(pre_value)
-                        else:
-                            value.eval_from_json(pre_value)
-                    else:  # ctx is not json request
-                        if hasattr(value, 'lessweb_eval_from_text'):
-                            value.lessweb_eval_from_text(pre_value)
-                        else:
-                            value.eval_from_text(pre_value)
-
-            else:  # pre_value == _nil
-                value = _nil
-        except (ValueError, TypeError) as e:
-            raise BadParamError(query=queryname, error=str(e))
-
-    if value == _nil:
-        if default == _nil:
-            raise NeedParamError(query=queryname, doc=queryname)
-        return default
-    else:
-        return value
-
-
-def fetch_model_param(ctx: Context, cls, fn):
-    """
-
-        >>> class Person(Model):
-        ...     name: str
-        ...     age: int
-        ...     weight: int
-        >>> def get_person(ctx, person: Person): pass
-        >>> ctx = Context()
-        >>> ctx.set_alias('weight', 'w')
-        >>> ctx._fields = dict(name='Bob', age='33', w='100', x='1')
-        >>> model = fetch_model_param(ctx, Person, get_person)
-        >>> assert model.storage() == {'name': 'Bob', 'age': 33, 'weight': 100}, model.items()
-    """
-    result = {}
-    for realname, realtype, default in get_model_parameters(cls):
-        if default == _readonly:
+    fields = {}
+    for realname, realtype in get_type_hints(core_type).items():
+        if realname[0] == '_': continue  # 私有成员不赋值
+        queryname = ctx.request._aliases.get(realname, realname)
+        inputval = ctx.request.get_input(queryname)
+        if is_optional_type(realtype):
+            realtype = optional_core(realtype)
+        if not isinstance(realtype, type):
             continue
-        if realtype == _nil:
-            realtype = str
-        value = input_by_choose(ctx, fn, realname, realtype, default)
-        result[realname] = value
-    model = cls()
-    model.setall(**result)
-    return model
+        if inputval is not None:
+            try:
+                fields[realname] = bridge.cast(inputval, realtype)
+            except (ValueError, TypeError) as e:
+                raise BadParamError(query=realname, error=str(e))
+        else:
+            pass  # 不赋值&不报错
+    if origin_type == Model:
+        object = core_type()
+        for key, val in fields.items():
+            setattr(object, key, val)
+        return Model(object)
 
 
-def fetch_param(ctx: Context, fn):
+def fetch_param(ctx: Context, fn: Callable) -> Dict[str, Any]:
     """
-        >>> def get_person(ctx:Context, name:str, age:int, weight:int, createAt:int=2):
-        ...     pass
-        >>> ctx = Context()
-        >>> ctx.querynames = 'name,age,weight'
-        >>> ctx.set_alias('weight', 'w')
-        >>> ctx._fields = dict(name='Bob', age='33', w='100', weight='1', createAt='9')
-        >>> param = fetch_param(ctx, get_person)
-        >>> assert param == {'ctx': ctx, 'name': 'Bob', 'age': 33, 'weight': 100, 'createAt': 2}, param
+    fn: dealer function
+    return: Dict[realname, Context|Request|Response|Model|...]
     """
-    result = {}
-    for realname, realtype, default in get_func_parameters(fn):
-        if isinstance(realtype, type):
-            if issubclass(realtype, Context):
-                result[realname] = ctx
+    result: Dict[str, Any] = {}
+    bridge = RequestBridge(ctx.app.request_bridges)
+    for realname, (realtype, has_default) in func_arg_spec(fn).items():
+        if realname == 'return': continue
+        if realtype == Context:
+            result[realname] = ctx
+        elif realtype == Request:
+            result[realname] = ctx.request
+        elif realtype == Response:
+            result[realname] = ctx.response
+        elif isinstance(realtype, type) and issubclass(realtype, Service):
+            result[realname] = fetch_service(ctx, realtype)
+        elif is_generic_type(realtype):
+            if get_origin(realtype) == Model:
+                result[realname] = fetch_model(ctx, bridge, generic_core(realtype), Model)
+        else:
+            if is_optional_type(realtype):
+                realtype = optional_core(realtype)
+            if not isinstance(realtype, type):
                 continue
-
-            if issubclass(realtype, Service):
-                result[realname] = realtype(ctx)
-                continue
-
-            if issubclass(realtype, Model):
-                result[realname] = fetch_model_param(ctx, realtype, fn)
-                continue
-
-        if realtype == _nil: realtype = str
-        value = input_by_choose(ctx, fn, realname, realtype, default)
-        result[realname] = value
+            queryname = ctx.request._aliases.get(realname, realname)
+            inputval = ctx.request.get_input(queryname)
+            if inputval is not None:
+                try:
+                    result[realname] = bridge.cast(inputval, realtype)
+                except (ValueError, TypeError) as e:
+                    raise BadParamError(query=realname, error=str(e))
+            elif not has_default:
+                raise NeedParamError(query=realname, doc='Missing Required Param')
+            else:
+                pass  # 不赋值&不报错
 
     return result
