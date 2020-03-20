@@ -6,7 +6,6 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import as_declarative, declared_attr
 
 from lessweb.context import Context
-from lessweb.model import Service
 from lessweb.application import Application
 
 
@@ -34,10 +33,10 @@ class DbModel(object):
     def __repr__(self) -> str: ...
 
 
-class DbServ(Service):
+class DbServ:
     ctx: Context
-    db: Session
-    def __init__(self, ctx: Context) -> None: ...
+    @property
+    def db(self) -> Session: ...
 
 
 T = TypeVar('T')

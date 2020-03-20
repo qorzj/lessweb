@@ -3,7 +3,6 @@ from enum import Enum
 from redis import Redis, ConnectionPool
 
 from ..context import Context
-from ..model import Service
 from ..application import Application
 
 
@@ -15,6 +14,9 @@ class RedisKey(Enum):
 
 
 class RedisPlugin:
+    redis_pool: ConnectionPool
+    patterns: Iterable[str]
+
     def __init__(self, host: str, port: int=6379, db: int=0, patterns: Iterable[str]=('.*',)):
         self.redis_pool = ConnectionPool(host=host, port=port, db=db)
         self.patterns = patterns
@@ -35,13 +37,12 @@ class RedisPlugin:
         pass
 
 
-class RedisServ(Service):
+class RedisServ:
     ctx: Context
-    redis: Redis
 
-    def __init__(self, ctx: Context):
-        self.ctx = ctx
-        session = ctx.box.get(RedisKey.session)
+    @property
+    def redis(self) -> Redis:
+        session = self.ctx.box.get(RedisKey.session)
         if session is None:
             raise ValueError('redis session not available')
-        self.redis = session
+        return session

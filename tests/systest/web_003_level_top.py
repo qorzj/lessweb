@@ -32,7 +32,7 @@ def f(a: complex = None):
 
 
 def g(x: Model[A]):
-    a = x.get()
+    a = x()
     return {'x': a.x, 'y': a.y, 'z': a}
 
 

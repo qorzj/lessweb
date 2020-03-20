@@ -8,7 +8,6 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import as_declarative, declared_attr
 
 from ..context import Context
-from ..model import Service
 from ..application import Application
 
 
@@ -81,16 +80,15 @@ class DbModel(object):
         return '<DbModel ' + repr(list(self.__dict__.items())) + '>'
 
 
-class DbServ(Service):
+class DbServ:
     ctx: Context
-    db: Session
 
-    def __init__(self, ctx: Context):
-        self.ctx = ctx
-        session = ctx.box.get(DatabaseKey.session)
+    @property
+    def db(self) -> Session:
+        session = self.ctx.box.get(DatabaseKey.session)
         if session is None:
             raise ValueError('database session not available')
-        self.db = session
+        return session
 
 
 T = TypeVar('T')

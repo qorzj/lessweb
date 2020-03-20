@@ -20,42 +20,51 @@ class Model(Generic[T]):
     def __init__(self, value: T) -> None:
         self.value: T = value
 
-    def get(self) -> T:
+    def __call__(self) -> T:
         return self.value
 
     def __str__(self):
         return f'lessweb.Model[{type(self.value)}]'
 
 
-class Service(metaclass=ABCMeta):
-    pass
+class Service(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value: T = value
+
+    def __call__(self) -> T:
+        return self.value
+
+    def __str__(self):
+        return f'lessweb.Model[{type(self.value)}]'
 
 
 def fetch_service(ctx: Context, service_type: Type):
-    self_flag = True
+    """
+    :return:  Service[service_type]
+    """
     params: Dict[str, Any] = {}
-    for realname, (realtype, _) in func_arg_spec(service_type.__init__).items():
-        if self_flag or realname == 'return':
-            self_flag = False
-        elif realtype == Context:
+    for realname, realtype in get_type_hints(service_type).items():
+        if realtype == Context:
             params[realname] = ctx
         elif realtype == Request:
             params[realname] = ctx.request
         elif realtype == Response:
             params[realname] = ctx.response
-        elif isinstance(realtype, type) and realtype != service_type \
-                and issubclass(realtype, Service):
-            params[realname] = fetch_service(ctx, realtype)
+        elif is_generic_type(realtype) and get_origin(realtype) == Service:
+            params[realname] = fetch_service(ctx, generic_core(realtype))
         else:
-            raise KeyError('%s.__init__(%s) param type is empty or wrong!' % (str(service_type), realname))
-    return service_type(**params)
+            pass  # 其他类型不注入
+    obj = service_type()
+    for key, val in params.items():
+        setattr(obj, key, val)
+    return Service(obj)
 
 
 def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_type: Type):
     """
-    return: origin_type[core_type]
+    :return:  origin_type[core_type]
     """
-    fields = {}
+    fields: Dict[str, Any] = {}
     for realname, realtype in get_type_hints(core_type).items():
         if realname[0] == '_': continue  # 私有成员不赋值
         queryname = ctx.request._aliases.get(realname, realname)
@@ -72,10 +81,10 @@ def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_typ
         else:
             pass  # 不赋值&不报错
     if origin_type == Model:
-        object = core_type()
+        obj = core_type()
         for key, val in fields.items():
-            setattr(object, key, val)
-        return Model(object)
+            setattr(obj, key, val)
+        return Model(obj)
 
 
 def fetch_param(ctx: Context, fn: Callable) -> Dict[str, Any]:
@@ -93,10 +102,10 @@ def fetch_param(ctx: Context, fn: Callable) -> Dict[str, Any]:
             result[realname] = ctx.request
         elif realtype == Response:
             result[realname] = ctx.response
-        elif isinstance(realtype, type) and issubclass(realtype, Service):
-            result[realname] = fetch_service(ctx, realtype)
         elif is_generic_type(realtype):
-            if get_origin(realtype) == Model:
+            if get_origin(realtype) == Service:
+                result[realname] = fetch_service(ctx, generic_core(realtype))
+            elif get_origin(realtype) == Model:
                 result[realname] = fetch_model(ctx, bridge, generic_core(realtype), Model)
         else:
             if is_optional_type(realtype):

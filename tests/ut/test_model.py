@@ -17,7 +17,7 @@ class Test(TestCase):
         ctx.request.set_alias('weight', 'w')
         ctx.request.param_input.load_query("name=Bob&age=33&w=100&x=1", encoding='utf8')
         model = fetch_model(ctx, RequestBridge([]), Person, Model)
-        self.assertDictEqual(Storage.of(model.get()), {'name': 'Bob', 'age': 33, 'weight': 100})
+        self.assertDictEqual(Storage.of(model()), {'name': 'Bob', 'age': 33, 'weight': 100})
 
     def test_fetch_param(self):
         def get_person(ctx: Context, name: str, age: int, weight: int, createAt: int = 2):
