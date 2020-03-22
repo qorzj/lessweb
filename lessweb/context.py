@@ -117,11 +117,14 @@ class Request:
     def set_alias(self, realname, queryname):
         self._aliases[realname] = queryname
 
+    def get_content_type(self) -> str:
+        return self.env.get('CONTENT_TYPE', '')
+
     def is_json(self) -> bool:
-        return 'json' in self.env.get('CONTENT_TYPE', '').lower()
+        return 'json' in self.get_content_type().lower()
 
     def is_form(self) -> bool:
-        content_type = self.env.get('CONTENT_TYPE', '').lower()
+        content_type = self.get_content_type().lower()
         return bool(content_type) and ('form-' in content_type or '-urlencoded' in content_type)
 
     def contains_cookie(self, name: str) -> bool:
