@@ -54,6 +54,7 @@ def fetch_service(ctx: Context, service_type: Type):
             params[realname] = fetch_service(ctx, generic_core(realtype))
         else:
             pass  # 其他类型不注入
+    if issubclass(service_type, Service): raise LookupError(service_type)
     obj = service_type()
     for key, val in params.items():
         setattr(obj, key, val)
@@ -81,6 +82,7 @@ def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_typ
         else:
             pass  # 不赋值&不报错
     if origin_type == Model:
+        if issubclass(core_type, Model): raise LookupError(core_type)
         obj = core_type()
         for key, val in fields.items():
             setattr(obj, key, val)
