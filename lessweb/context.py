@@ -148,6 +148,12 @@ class Request:
     def get_headernames(self) -> List[str]:
         return [s for s in (header_name_of_wsgi_key(k) for k in self.env.keys()) if s]
 
+    def get_auth_bearer(self) -> Optional[str]:
+        header_val = self.get_header('Authorization')
+        if header_val is None:
+            return None
+        return header_val[len('Bearer '):]
+
     def get_input(self, key: str) -> Optional[Union[ParamStr, Jsonizable]]:
         if key in self._params:
             # 此处使用cache不只是为了性能，更重要的是cgi不保证重名参数的顺序，如果每次得到的结果可能不同，会导致安全性漏洞
