@@ -1,25 +1,44 @@
-from lessweb import Application, Context
-
-def admin_hook(ctx: Context):
-    ctx.set_param('me', 'admin')
-    return ctx()
-
-def home(ctx: Context):
-    return 'Hello, %s!' % ctx.get_param('me', 'visitor')
+from enum import Enum
+from lessweb import Application, Model
 
 
-wx_app = Application()
-wx_app.add_get_mapping('/hello', home)
+def load_enum(obj, real_type):
+    if issubclass(real_type, Enum):
+        if isinstance(obj, str) and obj.isdigit():
+            return real_type(int(obj))
+        else:
+            return real_type(obj)
 
-admin_app = Application()
-admin_app.add_interceptor('.*', '*', admin_hook)
-admin_app.add_get_mapping('/hello', home)
 
-if __name__ == '__main__':
-    from aiohttp import web
-    from aiohttp_wsgi import WSGIHandler
+def dump_enum(source):
+    if isinstance(source, Enum):
+        return {'value': source.value, 'show': source.show} \
+            if hasattr(source, 'show') else source.value
 
-    aioapp = web.Application()
-    aioapp.router.add_route("*", "/wx/{path_info:.*}", WSGIHandler(wx_app.wsgifunc()))
-    aioapp.router.add_route("*", "/admin/{path_info:.*}", WSGIHandler(admin_app.wsgifunc()))
-    web.run_app(aioapp, port=8080)
+
+class Rank(Enum):
+    A = 'A'
+    B = 'B'
+    C = 'C'
+
+
+class Gender(Enum):
+    MALE = 1
+    FEMALE = 2
+
+Gender.MALE.show = '男'
+Gender.FEMALE.show = '女'
+
+class User:
+    id: int
+    gender: Gender
+    rank: Rank
+
+def add_user(user: Model[User]):
+    return user()
+
+app = Application()
+app.add_post_mapping('/user', dealer=add_user)
+app.add_request_bridge(load_enum)
+app.add_response_bridge(dump_enum)
+app.run()

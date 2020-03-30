@@ -10,7 +10,7 @@ import os
 import re
 import traceback
 from types import GeneratorType
-from typing import List, Any, Callable, Dict
+from typing import List, Any, Callable, Dict, Optional
 
 from .webapi import NeedParamError, BadParamError, NotFoundError, HttpStatus
 from .webapi import http_methods
@@ -302,7 +302,7 @@ class Application(object):
 
         return wsgi
 
-    def run(self, wsgifunc=None, port:int=8080, homepath:str='', staticpath:str='static'):
+    def run(self, wsgifunc=None, port:int=8080, homepath:str='', staticpath:Optional[str]='static'):
         """
         Example:
 
@@ -324,7 +324,7 @@ class Application(object):
             homepath = '/' + homepath
 
         if staticpath is not None:
-            makedir('static')
+            makedir(staticpath)
             app.router.add_static(prefix='/static/', path=staticpath)
         app.router.add_route("*", homepath + "/{path_info:.*}", WSGIHandler(wsgifunc))
         web.run_app(app, port=port)
