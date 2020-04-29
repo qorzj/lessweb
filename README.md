@@ -25,8 +25,8 @@ app.run()
 ## 本地测试步骤：
 ```bash
 virtualenv venv
-bash pre_test.sh
 . venv/bin/activate
+bash pre_test.sh
 nosetests -s tests/fast_test.py
 nosetests -s tests/slow_test.py
 nosetests -s tests/final_test.py

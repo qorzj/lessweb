@@ -1,7 +1,9 @@
-from typing import get_type_hints
+from typing import get_type_hints, TypeVar, Type
 
 
 __all__ = ["Storage"]
+
+T = TypeVar('T')
 
 
 class Storage(dict):
@@ -51,9 +53,29 @@ class Storage(dict):
         return self
 
     @staticmethod
-    def of(obj):
+    def type_hints(cls: Type) -> 'Storage':
+        result = Storage()
+        for prop_name, prop_type in get_type_hints(cls).items():
+            if prop_name[0] != '_':
+                result[prop_name] = prop_type
+            else:
+                pub_name = prop_name[1:]
+                if isinstance(getattr(cls, pub_name, None), property):
+                    result[pub_name] = prop_type
+        return result
+
+    @staticmethod
+    def of(obj) -> 'Storage':
         result = Storage()
         for name in get_type_hints(obj).keys():
-            if name[0] != '_' and hasattr(obj, name):
+            if name[0] == '_':
+                name = name[1:]
+            if hasattr(obj, name):
                 result[name] = getattr(obj, name)
         return result
+
+    def to(self, cls: Type[T]) -> T:
+        obj = cls()
+        for key, val in self.items():
+            setattr(obj, key, val)
+        return obj

@@ -35,7 +35,7 @@ class Service(Generic[T]):
         return self.value
 
     def __str__(self):
-        return f'lessweb.Model[{type(self.value)}]'
+        return f'lessweb.Service[{type(self.value)}]'
 
 
 def fetch_service(ctx: Context, service_type: Type):
