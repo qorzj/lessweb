@@ -7,11 +7,14 @@ from typing import Type, List, Callable, Union, Dict, Any
 from .storage import Storage
 
 
-__all__ = ["uint", "Jsonizable", "ParamStr", "MultipartFile", "RequestBridgeFunc", "ResponseBridgeFunc"]
+__all__ = ["uint", "Jsonizable", "ParamStr", "MultipartFile", "JsonBridgeFunc"]
 
 
 class uint(int):
-    pass
+    def __init__(self, v):
+        super().__init__()
+        if self < 0:
+            raise ValueError("invalid range for uint(): '%d'" % self)
 
 
 Jsonizable = Union[str, int, float, Dict, List, None]
@@ -33,25 +36,7 @@ class MultipartFile:
         return f'<MultipartFile filename={self.filename} value={str(self.value)}>'
 
 
-RequestBridgeFunc = Callable[[Union[ParamStr, Jsonizable], Type], Any]
-ResponseBridgeFunc = Callable[[Any], Jsonizable]
-
-
-def default_request_bridge(inputval: Union[ParamStr, Jsonizable], real_type: Type) -> Any:
-    if real_type == bool and isinstance(inputval, ParamStr):
-        if inputval == '✓': return True
-        if inputval == '✗': return False
-    if issubclass(real_type, int):
-        if isinstance(inputval, Dict) or isinstance(inputval, List) or inputval is None:
-            raise ValueError("invalid input value for int(): '%s'" % inputval)
-        n = int(inputval)
-        if real_type == uint and n < 0:
-            raise ValueError("invalid range for uint(): '%s'" % n)
-        return real_type(n)
-    if type(inputval) is real_type:
-        return inputval
-    else:
-        return real_type(inputval)
+JsonBridgeFunc = Callable[[Any], Jsonizable]
 
 
 def default_response_bridge(obj: Any) -> Jsonizable:
@@ -62,20 +47,7 @@ def default_response_bridge(obj: Any) -> Jsonizable:
     return None
 
 
-class RequestBridge:
-    def __init__(self, bridge_funcs: List[RequestBridgeFunc]):
-        self.bridges: List[Callable] = bridge_funcs
-
-    def cast(self, inputval: Union[ParamStr, Jsonizable], real_type: Type) -> Any:
-        for bridge_func in self.bridges:
-            dest_val = bridge_func(inputval, real_type)
-            if dest_val is not None:
-                return dest_val
-
-        return default_request_bridge(inputval, real_type)
-
-
-def make_response_encoder(bridge_funcs: List[ResponseBridgeFunc]):
+def make_response_encoder(bridge_funcs: List[JsonBridgeFunc]):
     class ResponseEncoder(JSONEncoder):
         def default(self, obj):
             if obj is None:
@@ -85,8 +57,9 @@ def make_response_encoder(bridge_funcs: List[ResponseBridgeFunc]):
                 if dest_val is not None:
                     return dest_val
             try:
-                return Storage.of(obj)
-            except:
-                return str(obj)
+                if Storage.type_hints(type(obj)):
+                    return Storage.of(obj)
+            except Exception:
+                pass
 
     return ResponseEncoder

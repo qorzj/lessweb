@@ -1,8 +1,6 @@
 from typing import Callable, Type, TypeVar, Generic, Dict, Any
-from abc import ABCMeta
 
 from lessweb.context import Context
-from lessweb.bridge import RequestBridge
 
 
 __all__ = ["Model", "Service"]
@@ -26,5 +24,5 @@ class Service(Generic[T]):
 
 
 def fetch_service(ctx: Context, service_type: Type) -> Any: ...
-def fetch_model(ctx: Context, bridge: RequestBridge, core_type: Type, origin_type: Type) -> Any: ...
+def fetch_model(ctx: Context, core_type: Type, origin_type: Type) -> Any: ...
 def fetch_param(ctx: Context, fn: Callable) -> Dict[str, Any]: ...

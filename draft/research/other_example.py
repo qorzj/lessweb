@@ -39,6 +39,5 @@ def add_user(user: Model[User]):
 
 app = Application()
 app.add_post_mapping('/user', dealer=add_user)
-app.add_request_bridge(load_enum)
-app.add_response_bridge(dump_enum)
+app.add_json_bridge(dump_enum)
 app.run()

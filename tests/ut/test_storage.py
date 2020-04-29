@@ -20,7 +20,7 @@ class Student:
 class Test(TestCase):
     def test_success(self):
         self.assertDictEqual({'id': int, 'name': str, 'status': int}, Storage.type_hints(Student))
-        student = Storage(id=1, name='John').to(Student)
+        student = Storage(id=1, name='John').to(cls=Student)
         self.assertEqual(student.id, 1)
         self.assertEqual(student.name, 'JOHN')
         self.assertEqual(student._hide, 'yes')

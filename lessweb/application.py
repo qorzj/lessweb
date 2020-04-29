@@ -18,7 +18,7 @@ from .context import Context
 from .model import fetch_param
 from .storage import Storage
 from .utils import eafp, re_standardize, makedir
-from .bridge import RequestBridge, make_response_encoder, RequestBridgeFunc, ResponseBridgeFunc
+from .bridge import make_response_encoder, JsonBridgeFunc
 from .pluginproto import PluginProto
 
 
@@ -92,8 +92,8 @@ class Application(object):
     def __init__(self, encoding:str='utf-8') -> None:
         self.mapping: List[Mapping] = []
         self.interceptors: List[Interceptor] = []
-        self.request_bridges: List[Callable] = []
         self.response_bridges: List[Callable] = []
+        self.response_encoder: Any = json.JSONEncoder
         self.encoding: str = encoding
         self.plugins: List[PluginProto] = []
 
@@ -145,11 +145,9 @@ class Application(object):
         patternobj = re.compile(re_standardize(pattern))
         self.interceptors.insert(0, Interceptor(pattern, method, dealer, patternobj))
 
-    def add_request_bridge(self, bridge_func: RequestBridgeFunc):
-        self.request_bridges.append(bridge_func)
-
-    def add_response_bridge(self, bridge_func: ResponseBridgeFunc):
+    def add_json_bridge(self, bridge_func: JsonBridgeFunc):
         self.response_bridges.append(bridge_func)
+        self.response_encoder = make_response_encoder(self.response_bridges)
 
     def add_mapping(self, pattern: str, method: str, dealer: Callable):
         """
@@ -263,7 +261,7 @@ class Application(object):
                     if not isinstance(resp, (bytes, str)) and resp is not None:
                         if not resp_content_type or \
                                 (resp_content_type and 'json' in resp_content_type.lower()):
-                            resp = json.dumps(resp, ensure_ascii=False, cls=make_response_encoder(self.response_bridges))
+                            resp = json.dumps(resp, ensure_ascii=False, cls=self.response_encoder)
                             mimekey = 'json'
                         else:
                             resp = str(resp)
