@@ -145,7 +145,10 @@ class Mapper(Generic[T]):
                 prop_type = self.model_schema[key]
                 is_optional, prop_type = optional_core(prop_type)
                 if val is not None:
-                    setattr(obj, key, prop_type(val))
+                    if isinstance(val, prop_type):
+                        setattr(obj, key, val)
+                    else:
+                        setattr(obj, key, prop_type(val))
                 elif val is None and is_optional:
                     setattr(obj, key, None)
         return obj

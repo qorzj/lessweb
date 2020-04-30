@@ -86,7 +86,7 @@ def request_bridge(inputval: Any, target_type: Type):
             return [request_bridge(item, item_type) for item in inputval]
         else:
             return target_type(*inputval)
-    elif type(inputval) == target_type:
+    elif isinstance(inputval, target_type):
         return inputval
     else:
         return target_type(inputval)
