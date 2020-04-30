@@ -71,7 +71,7 @@ class Request:
         self.fullpath: str = ''
 
         self.body_data: Optional[bytes] = None  # Raw Body Input
-        self.json_input: Optional[Dict] = None  # Input from Json Body
+        self.json_input: Optional[Jsonizable] = None  # Input from Json Body
         self.param_input: ParamInput = ParamInput()  # Param Inputs
         self.file_input: Dict[str, List[MultipartFile]] = {}  # Uploaded File Inputs
 

@@ -53,8 +53,8 @@ def build_controller(dealer):
     把接收多个参数的dealer转变成只接收一个参数(ctx)的函数
     """
     def _1_controller(ctx:Context):
-        params = fetch_param(ctx, dealer)
-        return dealer(**params)
+        args, params = fetch_param(ctx, dealer)
+        return dealer(*args, **params)
 
     return _1_controller
 
@@ -67,8 +67,8 @@ def interceptor(dealer):
     def _1_wrapper(fn):
         def _1_1_controller(ctx:Context):
             ctx.app_stack.append(build_controller(fn))
-            params = fetch_param(ctx, dealer)
-            result = dealer(**params)
+            args, params = fetch_param(ctx, dealer)
+            result = dealer(*args, **params)
             ctx.app_stack.pop()  # 有多次调用ctx()的可能性，比如批量删除
             return result
 

@@ -20,14 +20,14 @@ class TestLevelBottom(unittest.TestCase):
         resp = requests.post(url, json={'a': [1, 2]})
         self.assertDictEqual(expect_dict, resp.json())
 
-        # url = 'http://localhost:8080/model'
-        # expect_dict = {'x': 1, 'y': {'real': 2, 'imag': 3},
-        #                'z': {'x': 1, 'y': {'real': 2, 'imag': 3}}}
-        # resp = requests.post(url, {'x': '1', 'y': '2,3'})
-        # self.assertDictEqual(expect_dict, resp.json())
-        #
-        # resp = requests.post(url, json={'x': 1, 'y': [2, 3]})
-        # self.assertDictEqual(expect_dict, resp.json())
+        url = 'http://localhost:8080/model'
+        expect_dict = {'x': 1, 'y': {'real': 2, 'imag': 3},
+                       'z': {'x': 1, 'y': {'real': 2, 'imag': 3}}}
+        resp = requests.post(url, {'x': '1', 'y': '2+3j'})
+        self.assertDictEqual(expect_dict, resp.json())
+
+        resp = requests.post(url, json={'x': 1, 'y': [2, 3]})
+        self.assertDictEqual(expect_dict, resp.json())
 
         url = 'http://localhost:8080/other'
         expect_dict = {'a': False, 'b': 0}

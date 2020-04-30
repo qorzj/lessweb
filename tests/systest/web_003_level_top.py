@@ -31,9 +31,8 @@ def f(a: complex = None):
         return {'result': a * 2}
 
 
-# def g(x: Model[A]):
-#     a = x()
-#     return {'x': a.x, 'y': a.y, 'z': a}
+def g(a: A, /):
+    return {'x': a.x, 'y': a.y, 'z': a}
 
 
 def h(a: bool, b: uint):
@@ -49,8 +48,8 @@ app.add_patch_mapping('.*', pid)
 app.add_get_mapping('/complex', f)
 app.add_post_mapping('/complex', f)
 
-# app.add_get_mapping('/model', g)
-# app.add_post_mapping('/model', g)
+app.add_get_mapping('/model', g)
+app.add_post_mapping('/model', g)
 
 app.add_get_mapping('/other', h)
 app.add_post_mapping('/other', h)

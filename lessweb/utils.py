@@ -1,3 +1,4 @@
+import sys
 from typing import Any, Tuple, Dict, Type, get_type_hints, Callable
 from contextlib import contextmanager
 import json
@@ -5,9 +6,11 @@ from pathlib import Path
 import pickle
 import re
 import inspect
+from inspect import Signature
 
 
 __all__ = ["eafp", "_nil", "re_standardize", "func_arg_spec", "makedir"]
+NEW_INSPECT = sys.version_info[:3] >= (3, 8, 0)
 
 
 def eafp(ask: Callable, default: Any) -> Any:
@@ -61,15 +64,15 @@ def re_standardize(pattern: str) -> str:
     return re.sub(r'\{([^0-9].*?)\}', _repl, pattern)
 
 
-def func_arg_spec(fn: Any) -> Dict[str, Tuple[Type, bool]]:
-    arg_spec = {}  # name: (type_, has_default)
-    inspect_ret = inspect.getfullargspec(fn)
-    annotations = get_type_hints(fn)
-    kw_len = len(inspect_ret.args) - len(inspect_ret.defaults or ())
-    for i, name in enumerate(inspect_ret.args):
-        arg_spec[name] = (annotations.get(name, Any), i >= kw_len)
-    for name in inspect_ret.kwonlyargs:
-        arg_spec[name] = (annotations.get(name, Any), True)
+def func_arg_spec(fn: Any) -> Dict[str, Tuple[Type, bool, bool]]:
+    empty = Signature.empty
+    arg_spec = {}  # name: (type_, has_default, positional-only)
+    for name, param in inspect.signature(fn).parameters.items():
+        arg_spec[name] = (
+            Any if param.annotation is empty else param.annotation,
+            param.default is not empty,
+            NEW_INSPECT and param.kind == 0
+        )
     return arg_spec
 
 
