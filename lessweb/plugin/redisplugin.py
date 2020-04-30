@@ -17,8 +17,11 @@ class RedisPlugin:
     redis_pool: ConnectionPool
     patterns: Iterable[str]
 
-    def __init__(self, host: str, port: int=6379, db: int=0, patterns: Iterable[str]=('.*',)):
-        self.redis_pool = ConnectionPool(host=host, port=port, db=db)
+    def __init__(self, host: str, port: int=6379, db: int=0, password: str=None, patterns: Iterable[str]=('.*',)):
+        if password is None:
+            self.redis_pool = ConnectionPool(host=host, port=port, db=db)
+        else:
+            self.redis_pool = ConnectionPool(host=host, port=port, db=db, password=password)
         self.patterns = patterns
 
     def processor(self, ctx: Context):
