@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Type, Tuple
 from typing_inspect import is_optional_type, is_generic_type, get_origin
 
 
@@ -9,5 +9,5 @@ is_generic_type = is_generic_type
 get_origin = get_origin
 
 
-def optional_core(t: Type) -> Type: ...
+def optional_core(t: Type) -> Tuple[bool, Type]:
 def generic_core(t: Type) -> Type: ...

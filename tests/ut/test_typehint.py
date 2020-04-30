@@ -8,12 +8,15 @@ T = TypeVar('T')
 
 class Test(TestCase):
     def test_optional_core(self):
-        type_str = str(optional_core(List[int]))
-        self.assertEqual(type_str, "<class 'NoneType'>")
-        type_str = str(optional_core(Optional[str]))
-        self.assertEqual(type_str, "<class 'str'>")
-        type_str = str(optional_core(Union[int, str]))
-        self.assertEqual(type_str, "<class 'NoneType'>")
+        is_optional, core_type = optional_core(List[int])
+        self.assertFalse(is_optional)
+        self.assertEqual(str(core_type), "typing.List[int]")
+        is_optional, core_type = optional_core(Optional[str])
+        self.assertTrue(is_optional)
+        self.assertEqual(str(core_type), "<class 'str'>")
+        is_optional, core_type = optional_core(Union[int, str])
+        self.assertFalse(is_optional)
+        self.assertEqual(str(core_type), "typing.Union[int, str]")
 
     def test_generic_core(self):
         self.assertFalse(is_generic_type(int))
@@ -27,5 +30,5 @@ class Test(TestCase):
         self.assertEqual(get_origin(list), None)
         self.assertEqual(get_origin(bool), None)
         self.assertEqual(get_origin(List[bool]), list)
-        type_str = str(generic_core(List[bool]))
-        self.assertEqual(type_str, "<class 'bool'>")
+        core_type = generic_core(List[bool])
+        self.assertEqual(str(core_type), "<class 'bool'>")

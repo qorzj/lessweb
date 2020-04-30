@@ -9,7 +9,7 @@ from sqlalchemy.orm.session import Session
 from ..context import Context
 from ..application import Application
 from ..storage import Storage
-from ..typehint import is_optional_type
+from ..typehint import optional_core
 
 
 __all__ = ["DbPlugin", "DbServ", "Mapper"]
@@ -143,10 +143,11 @@ class Mapper(Generic[T]):
         for key, val in row.items():
             if key in self.model_schema:
                 prop_type = self.model_schema[key]
-                if val is None and is_optional_type(prop_type):
-                    setattr(obj, key, val)
-                elif val is not None:
+                is_optional, prop_type = optional_core(prop_type)
+                if val is not None:
                     setattr(obj, key, prop_type(val))
+                elif val is None and is_optional:
+                    setattr(obj, key, None)
         return obj
 
     def select_count(self) -> int:

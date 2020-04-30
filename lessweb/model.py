@@ -4,7 +4,7 @@ from functools import lru_cache
 from .context import Context, Request, Response
 from .webapi import BadParamError
 from .bridge import ParamStr
-from .typehint import optional_core, generic_core, is_optional_type, is_generic_type, get_origin
+from .typehint import optional_core, generic_core, is_generic_type, get_origin
 from .utils import func_arg_spec
 from .storage import Storage
 
@@ -59,13 +59,12 @@ def request_bridge(inputval: Any, target_type: Type):
     """
     if target_type == Any:
         return inputval
+    target_is_optional, target_type = optional_core(target_type)
     if inputval is None:
-        if is_optional_type(target_type):
+        if target_is_optional:
             return None
         else:
             raise ValueError("Cannot assign None when expected %s" % target_type)
-    if is_optional_type(target_type):
-        target_type = optional_core(target_type)
     if isinstance(inputval, ParamStr):
         if issubclass(target_type, int):
             return target_type(int(inputval))
@@ -135,8 +134,7 @@ def fetch_param(ctx: Context, fn: Callable) -> Tuple[List, Dict[str, Any]]:
         elif model_or_service(realtype) == 2:
             value = fetch_service(ctx, realtype)
         else:
-            if is_optional_type(realtype):
-                realtype = optional_core(realtype)
+            _, realtype = optional_core(realtype)
             if not isinstance(realtype, type):
                 raise BadParamError(param=realname, message='Unsupported type %s' % realtype)
             if positional_only:
