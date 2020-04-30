@@ -1,90 +1,96 @@
-from typing import Callable, Optional, Type, get_type_hints, TypeVar, Generic, Dict, Any
+from typing import Callable, Optional, Type, get_type_hints, Dict, Any, List
 
+from functools import lru_cache
 from .context import Context, Request, Response
-from .webapi import NeedParamError, BadParamError
-from .bridge import Jsonizable, MultipartFile
+from .webapi import BadParamError
+from .bridge import ParamStr
 from .typehint import optional_core, generic_core, is_optional_type, is_generic_type, get_origin
 from .utils import func_arg_spec
 from .storage import Storage
 
 
-__all__ = ["Model", "Service"]
+__all__ = ['request_bridge']
 
 
-T = TypeVar('T')
-
-
-class Model(Generic[T]):
-    def __init__(self, value: T) -> None:
-        self.value: T = value
-
-    def __call__(self) -> T:
-        return self.value
-
-    def __str__(self):
-        return f'lessweb.Model[{type(self.value)}]'
-
-
-class Service(Generic[T]):
-    def __init__(self, value: T) -> None:
-        self.value: T = value
-
-    def __call__(self) -> T:
-        return self.value
-
-    def __str__(self):
-        return f'lessweb.Service[{type(self.value)}]'
+@lru_cache
+def model_or_service(cls: Type) -> int:
+    """
+    :return: 1=Model 2=Service 0=None
+    """
+    try:
+        for prop_type in get_type_hints(cls).values():
+            if prop_type == int or prop_type == str:
+                return 1
+            elif prop_type == Context or prop_type == Request or prop_type == Response \
+                    or model_or_service(prop_type) == 2:
+                return 2
+            else:
+                return 1
+        return 0
+    except:
+        return 0
 
 
 def fetch_service(ctx: Context, service_type: Type):
     """
-    :return:  Service[service_type]
+    :return:  cast(service_type, ctx)
     """
     params: Dict[str, Any] = {}
-    for realname, realtype in get_type_hints(service_type).items():
+    for realname, realtype in Storage.type_hints(service_type).items():
         if realtype == Context:
             params[realname] = ctx
         elif realtype == Request:
             params[realname] = ctx.request
         elif realtype == Response:
             params[realname] = ctx.response
-        elif is_generic_type(realtype) and get_origin(realtype) == Service:
-            params[realname] = fetch_service(ctx, generic_core(realtype))
+        elif model_or_service(realtype) == 2:
+            params[realname] = fetch_service(ctx, realtype)
         else:
             pass  # 其他类型不注入
-    if issubclass(service_type, Service): raise LookupError(service_type)
-    obj = service_type()
+    service_obj = service_type()
     for key, val in params.items():
-        setattr(obj, key, val)
-    return Service(obj)
+        setattr(service_obj, key, val)
+    return service_obj
 
 
-def fetch_model(ctx: Context, core_type: Type, origin_type: Type):
+def request_bridge(inputval: Any, target_type: Type):
     """
-    :return:  origin_type[core_type]
+    :return:  cast(target_type, inputval)
     """
-    fields: Dict[str, Any] = {}
-    for realname, realtype in get_type_hints(core_type).items():
-        if realname[0] == '_': continue  # 私有成员不赋值
-        queryname = ctx.request._aliases.get(realname, realname)
-        inputval = ctx.request.get_input(queryname)
-        if is_optional_type(realtype):
-            realtype = optional_core(realtype)
-        if not isinstance(realtype, type):
-            continue
-        if inputval is not None:
-            try:
-                fields[realname] = realtype(inputval)
-            except (ValueError, TypeError) as e:
-                raise BadParamError(query=realname, error=str(e))
+    if target_type == Any:
+        return inputval
+    if inputval is None:
+        if is_optional_type(target_type):
+            return None
         else:
-            pass  # 不赋值&不报错
-    if origin_type == Model:
-        if issubclass(core_type, Model): raise LookupError(core_type)
-        obj = core_type()
-        for key, val in fields.items():
-            setattr(obj, key, val)
-        return Model(obj)
+            raise ValueError("Cannot assign None when expected %s" % target_type)
+    if is_optional_type(target_type):
+        target_type = optional_core(target_type)
+    if isinstance(inputval, ParamStr):
+        if issubclass(target_type, int):
+            return target_type(int(inputval))
+        else:
+            return target_type(inputval)
+    if isinstance(inputval, dict):
+        if model_or_service(target_type) == 1:
+            target_obj = target_type()
+            for prop_name, prop_type in Storage.type_hints(target_type).items():
+                if prop_name in inputval:
+                    prop_value = request_bridge(inputval[prop_name], prop_type)
+                    setattr(target_obj, prop_name, prop_value)
+            return target_obj
+        else:
+            return target_type(**inputval)
+    elif isinstance(inputval, list):
+        if is_generic_type(target_type) and get_origin(target_type) == list:
+            item_type = generic_core(target_type)
+            return [request_bridge(item, item_type) for item in inputval]
+        else:
+            return target_type(*inputval)
+    elif type(inputval) == target_type:
+        return inputval
+    else:
+        return target_type(inputval)
 
 
 def fetch_param(ctx: Context, fn: Callable) -> Dict[str, Any]:
@@ -101,11 +107,8 @@ def fetch_param(ctx: Context, fn: Callable) -> Dict[str, Any]:
             result[realname] = ctx.request
         elif realtype == Response:
             result[realname] = ctx.response
-        elif is_generic_type(realtype):
-            if get_origin(realtype) == Service:
-                result[realname] = fetch_service(ctx, generic_core(realtype))
-            elif get_origin(realtype) == Model:
-                result[realname] = fetch_model(ctx, generic_core(realtype), Model)
+        elif model_or_service(realtype) == 2:
+            result[realname] = fetch_service(ctx, realtype)
         else:
             if is_optional_type(realtype):
                 realtype = optional_core(realtype)
@@ -115,11 +118,11 @@ def fetch_param(ctx: Context, fn: Callable) -> Dict[str, Any]:
             inputval = ctx.request.get_input(queryname)
             if inputval is not None:
                 try:
-                    result[realname] = realtype(inputval)
-                except (ValueError, TypeError) as e:
-                    raise BadParamError(query=realname, error=str(e))
+                    result[realname] = request_bridge(inputval, realtype)
+                except Exception as e:
+                    raise BadParamError(param=realname, message=str(e))
             elif not has_default:
-                raise NeedParamError(query=realname, doc='Missing Required Param')
+                raise BadParamError(param=realname, message='Missing required param')
             else:
                 pass  # 不赋值&不报错
 

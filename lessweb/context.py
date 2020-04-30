@@ -155,8 +155,8 @@ class Request:
         return header_val[len('Bearer '):]
 
     def get_input(self, key: str) -> Optional[Union[ParamStr, Jsonizable]]:
+        # 注意cgi不保证重名参数的顺序，如果每次请求得到的结果可能不同
         if key in self._params:
-            # 此处使用cache不只是为了性能，更重要的是cgi不保证重名参数的顺序，如果每次得到的结果可能不同，会导致安全性漏洞
             return self._params[key]
         param = self.param_input
         ret: Optional[Union[ParamStr, Jsonizable]]

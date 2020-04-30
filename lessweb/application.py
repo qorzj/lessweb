@@ -12,7 +12,7 @@ import traceback
 from types import GeneratorType
 from typing import List, Any, Callable, Dict, Optional
 
-from .webapi import NeedParamError, BadParamError, NotFoundError, HttpStatus
+from .webapi import BadParamError, NotFoundError, HttpStatus
 from .webapi import http_methods
 from .context import Context
 from .model import fetch_param
@@ -118,9 +118,9 @@ class Application(object):
                 if itr.patternobj.search(ctx.request.path) and (itr.method == ctx.request.method or itr.method == '*'):
                     f = interceptor(itr.dealer)(f)
             return f(ctx)
-        except (NeedParamError, BadParamError) as e:
+        except BadParamError as e:
             ctx.response.set_status(HttpStatus.BadRequest)
-            return repr(e)
+            return {'message': e.message, 'param': e.param}
         except NotFoundError as e:
             if e.methods:
                 ctx.response.send_allow_methods(e.methods)

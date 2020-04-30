@@ -19,10 +19,6 @@ from .context import (
     Request as Request,
     Response as Response,
 )
-from .model import (
-    Model as Model,
-    Service as Service,
-)
 from .storage import (
     Storage as Storage,
 )
@@ -33,7 +29,6 @@ from .bridge import (
     Jsonizable as Jsonizable,
 )
 from .webapi import (
-    NeedParamError as NeedParamError,
     BadParamError as BadParamError,
     NotFoundError as NotFoundError,
     Cookie as Cookie,

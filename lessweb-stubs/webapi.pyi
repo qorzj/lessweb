@@ -9,7 +9,7 @@ from .bridge import ParamStr, MultipartFile
 
 
 __all__ = ["mimetypes", "hop_by_hop_headers", "http_methods", "ParamInput", "ResponseStatus", "HttpStatus",
-           "Cookie", "parse_cookie", "NeedParamError", "BadParamError", "NotFoundError"]
+           "Cookie", "parse_cookie", "BadParamError", "NotFoundError"]
 
 
 mimetypes: Dict
@@ -77,18 +77,10 @@ class Cookie:
 def parse_cookie(http_cookie: str)->Dict[str, str]: ...
 
 
-class NeedParamError(Exception):
-    query: str
-    doc: str
-    def __init__(self, query: str, doc: str) -> None: ...
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-
-
 class BadParamError(Exception):
-    query: str
-    error: str
-    def __init__(self, query: str, error: str) -> None: ...
+    param: str
+    message: str
+    def __init__(self, param: str, message: str) -> None: ...
     def __repr__(self) -> str: ...
     def __str__(self) -> str: ...
 

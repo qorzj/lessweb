@@ -1,7 +1,9 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, ClassVar, Callable, TypeVar
 from unittest import TestCase
-from lessweb.typehint import optional_core, generic_core
-from lessweb.model import Model
+from lessweb.typehint import optional_core, generic_core, is_generic_type, get_origin
+
+
+T = TypeVar('T')
 
 
 class Test(TestCase):
@@ -14,5 +16,16 @@ class Test(TestCase):
         self.assertEqual(type_str, "<class 'NoneType'>")
 
     def test_generic_core(self):
-        type_str = str(generic_core(Model[list]))
-        self.assertEqual(type_str, "<class 'list'>")
+        self.assertFalse(is_generic_type(int))
+        self.assertFalse(is_generic_type(Union[int, str]))
+        self.assertFalse(is_generic_type(Union[int, T]))
+        self.assertFalse(is_generic_type(ClassVar[List[int]]))
+        self.assertFalse(is_generic_type(Callable[..., T]))
+        self.assertFalse(is_generic_type(bool))
+        self.assertFalse(is_generic_type(list))
+        self.assertTrue(is_generic_type, List[bool])
+        self.assertEqual(get_origin(list), None)
+        self.assertEqual(get_origin(bool), None)
+        self.assertEqual(get_origin(List[bool]), list)
+        type_str = str(generic_core(List[bool]))
+        self.assertEqual(type_str, "<class 'bool'>")

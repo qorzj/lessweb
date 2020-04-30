@@ -1,5 +1,5 @@
 import os
-from lessweb import Application, Context, Request, ResponseStatus, ParamStr, MultipartFile, Model, uint
+from lessweb import Application, Context, Request, ResponseStatus, ParamStr, MultipartFile, uint
 
 
 def load_complex(n, real_type):
@@ -31,9 +31,9 @@ def f(a: complex = None):
         return {'result': a * 2}
 
 
-def g(x: Model[A]):
-    a = x()
-    return {'x': a.x, 'y': a.y, 'z': a}
+# def g(x: Model[A]):
+#     a = x()
+#     return {'x': a.x, 'y': a.y, 'z': a}
 
 
 def h(a: bool, b: uint):
@@ -49,14 +49,14 @@ app.add_patch_mapping('.*', pid)
 app.add_get_mapping('/complex', f)
 app.add_post_mapping('/complex', f)
 
-app.add_get_mapping('/model', g)
-app.add_post_mapping('/model', g)
+# app.add_get_mapping('/model', g)
+# app.add_post_mapping('/model', g)
 
 app.add_get_mapping('/other', h)
 app.add_post_mapping('/other', h)
 
-app.add_request_bridge(load_complex)
-app.add_response_bridge(dump_complex)
+
+app.add_json_bridge(dump_complex)
 
 
 if __name__ == '__main__':

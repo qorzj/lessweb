@@ -9,7 +9,7 @@ from .bridge import ParamStr, MultipartFile
 
 
 __all__ = ["mimetypes", "hop_by_hop_headers", "http_methods", "ParamInput", "ResponseStatus", "HttpStatus",
-           "Cookie", "parse_cookie", "NeedParamError", "BadParamError", "NotFoundError"]
+           "Cookie", "parse_cookie", "BadParamError", "NotFoundError"]
 
 
 mimetypes = {
@@ -149,29 +149,16 @@ def parse_cookie(http_cookie: str)->Dict[str, str]:
     return cookies
 
 
-# lessweb framework exceptions
-class NeedParamError(Exception):
-    def __init__(self, query, doc):
-        self.query: str = query
-        self.doc: str = doc
-
-    def __repr__(self):
-        return 'lessweb.NeedParamError query:%s doc:%s' % (self.query, self.doc)
-
-    def __str__(self):
-        return 'query:%s doc:%s' % (self.query, self.doc)
-
-
 class BadParamError(Exception):
-    def __init__(self, query, error):
-        self.query: str = query
-        self.error: str = error
+    def __init__(self, param: str, message: str):
+        self.param: str = param
+        self.message: str = message
 
     def __repr__(self):
-        return 'lessweb.BadParamError query:%s error:%s' % (self.query, self.error)
+        return 'lessweb.BadParamError param:%s message:%s' % (self.param, self.message)
 
     def __str__(self):
-        return 'query:%s error:%s' % (self.query, self.error)
+        return self.message
 
 
 class NotFoundError(Exception):

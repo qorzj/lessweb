@@ -59,7 +59,7 @@ def make_response_encoder(bridge_funcs: List[JsonBridgeFunc]):
             try:
                 if Storage.type_hints(type(obj)):
                     return Storage.of(obj)
-            except Exception:
+            except:
                 pass
 
     return ResponseEncoder

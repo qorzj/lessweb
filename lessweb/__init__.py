@@ -12,8 +12,7 @@ __license__ = "MIT"
 
 from .application import interceptor, Application
 from .context import Context, Request, Response
-from .model import Model, Service
 from .storage import Storage
 from .bridge import uint, ParamStr, MultipartFile, Jsonizable
-from .webapi import NeedParamError, BadParamError, NotFoundError, Cookie, HttpStatus, ResponseStatus
+from .webapi import BadParamError, NotFoundError, Cookie, HttpStatus, ResponseStatus
 from .utils import _nil, eafp
