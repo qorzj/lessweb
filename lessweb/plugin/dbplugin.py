@@ -109,9 +109,9 @@ class Mapper(Generic[T]):
     tablename: str
     model_schema: Storage
     primary_key: str
-    where_sqls: List[str]
-    where_data: Dict
-    orderby_sql: str = ''
+    _where_sqls: List[str]
+    _where_data: Dict
+    _orderby_sql: str = ''
 
     def __init__(self, session: Session, cls: Type[T]) -> None:
         self.session = session
@@ -121,11 +121,11 @@ class Mapper(Generic[T]):
         if not self.model_schema:
             raise TypeError('%s schema is empty!' % cls)
         self.primary_key = next(iter(self.model_schema))
-        self.where_sqls = []
-        self.where_data = {}
+        self._where_sqls = []
+        self._where_data = {}
 
     def _where_clause(self) -> str:
-        return ' and '.join(f'({s})' for s in self.where_sqls)
+        return ' and '.join(f'({s})' for s in self._where_sqls)
 
     def _full_select_sql(self) -> str:
         where_clause = self._where_clause()
@@ -134,8 +134,8 @@ class Mapper(Generic[T]):
             sql = f'SELECT {titles} FROM `{self.tablename}` WHERE {where_clause}'
         else:
             sql = f'SELECT {titles} FROM `{self.tablename}`'
-        if self.orderby_sql:
-            sql += f' ORDER BY {self.orderby_sql}'
+        if self._orderby_sql:
+            sql += f' ORDER BY {self._orderby_sql}'
         return sql
 
     def bridge(self, row) -> T:
@@ -159,11 +159,11 @@ class Mapper(Generic[T]):
             sql = f'SELECT COUNT(1) FROM `{self.tablename}` WHERE {where_clause}'
         else:
             sql = f'SELECT COUNT(1) FROM `{self.tablename}`'
-        return self.session.execute(sql, self.where_data).scalar()
+        return self.session.execute(sql, self._where_data).scalar()
 
     def select_first(self) -> Optional[T]:
         sql = self._full_select_sql() + ' LIMIT 1'
-        row = self.session.execute(sql, self.where_data).first()
+        row = self.session.execute(sql, self._where_data).first()
         if row is None:
             return None
         return self.bridge(row)
@@ -171,14 +171,15 @@ class Mapper(Generic[T]):
     def select(self) -> List[T]:
         ret = []
         sql = self._full_select_sql()
-        rows = self.session.execute(sql, self.where_data)
+        rows = self.session.execute(sql, self._where_data)
         for row in rows:
             ret.append(self.bridge(row))
         return ret
 
     def insert(self, obj: T, commit: bool=True) -> None:
-        titles = ','.join(f'`{key}`' for key in self.model_schema)
-        slots = ','.join(f':{key}' for key in self.model_schema)
+        obj_storage = Storage.of(obj)
+        titles = ','.join(f'`{key}`' for key in obj_storage.keys())
+        slots = ','.join(f':{key}' for key in obj_storage.keys())
         sql = f'INSERT INTO `{self.tablename}` ({titles}) VALUES ({slots})'
         result = self.session.execute(sql, Storage.of(obj))
         setattr(obj, self.primary_key, result.lastrowid)
@@ -190,7 +191,7 @@ class Mapper(Generic[T]):
         titles = ','.join(f'`{key}`' for key in obj_storage.keys())
         slots = ','.join(f':{key}_1' for key in obj_storage.keys())
         data = {f'{key}_1': val for key, val in obj_storage.items()}
-        data.update(self.where_data)
+        data.update(self._where_data)
         where_clause = self._where_clause()
         if not where_clause:
             raise ValueError(f'WHERE clause cannot be empty for INSERT_IF_NOT_EXIST!')
@@ -204,7 +205,7 @@ class Mapper(Generic[T]):
         obj_storage = Storage.of(obj)
         set_sql = ', '.join(f'`{key}`=:{key}_1' for key in obj_storage.keys())
         data = {f'{key}_1': val for key, val in obj_storage.items()}
-        data.update(self.where_data)
+        data.update(self._where_data)
         where_clause = self._where_clause()
         if not where_clause:
             raise ValueError(f'WHERE clause cannot be empty for UPDATE!')
@@ -217,7 +218,7 @@ class Mapper(Generic[T]):
         obj_dict = {key: val for key, val in Storage.of(obj).items() if isinstance(val, int)}
         set_sql = ', '.join(f'`{key}`=`{key}`+(:{key}_1)' for key in obj_dict.keys())
         data = {f'{key}_1': val for key, val in obj_dict.items()}
-        data.update(self.where_data)
+        data.update(self._where_data)
         where_clause = self._where_clause()
         if not where_clause:
             raise ValueError(f'WHERE clause cannot be empty for increment UPDATE!')
@@ -231,34 +232,34 @@ class Mapper(Generic[T]):
         if not where_clause:
             raise ValueError(f'WHERE clause cannot be empty for DELETE!')
         sql = f'DELETE FROM `{self.tablename}` WHERE {where_clause}'
-        self.session.execute(sql, self.where_data)
+        self.session.execute(sql, self._where_data)
         if commit:
             self.session.commit()
 
     def by_id(self, primary_key: Union[int, str]) -> 'Mapper[T]':
         sql = f'`{self.primary_key}`=:{self.primary_key}'
         data = {self.primary_key: primary_key}
-        self.where_sqls.append(sql)
-        self.where_data.update(data)
+        self._where_sqls.append(sql)
+        self._where_data.update(data)
         return self
 
     def and_equal(self, obj: T) -> 'Mapper[T]':
         data = Storage.of(obj)
-        self.where_data.update(data)
+        self._where_data.update(data)
         for key, val in data.items():
             sql = f'`{key}`=:{key}'
-            self.where_sqls.append(sql)
+            self._where_sqls.append(sql)
         return self
 
-    def and_(self, clause: str, obj: T) -> 'Mapper[T]':
-        self.where_sqls.append(clause)
-        self.where_data.update(Storage.of(obj))
+    def and_(self, clause: str, data: Storage) -> 'Mapper[T]':
+        self._where_sqls.append(clause)
+        self._where_data.update(data)
         return self
 
     def order_desc(self) -> 'Mapper[T]':
-        self.orderby_sql = f'`{self.primary_key}` desc'
+        self._orderby_sql = f'`{self.primary_key}` desc'
         return self
 
     def order_by(self, clause: str) -> 'Mapper[T]':
-        self.orderby_sql = clause
+        self._orderby_sql = clause
         return self
