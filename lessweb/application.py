@@ -53,7 +53,10 @@ def build_controller(dealer):
     把接收多个参数的dealer转变成只接收一个参数(ctx)的函数
     """
     def _1_controller(ctx:Context):
-        args, params = fetch_param(ctx, dealer)
+        try:
+            args, params = fetch_param(ctx, dealer)
+        except Exception as e:
+            raise BadParamError(message=str(e), param='')
         return dealer(*args, **params)
 
     return _1_controller
@@ -93,7 +96,7 @@ class Application(object):
         self.mapping: List[Mapping] = []
         self.interceptors: List[Interceptor] = []
         self.response_bridges: List[Callable] = []
-        self.response_encoder: Any = json.JSONEncoder
+        self.response_encoder: Any = make_response_encoder([])
         self.encoding: str = encoding
         self.plugins: List[PluginProto] = []
 

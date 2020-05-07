@@ -243,8 +243,8 @@ class Mapper(Generic[T]):
         self._where_data.update(data)
         return self
 
-    def and_equal(self, obj: T) -> 'Mapper[T]':
-        data = Storage.of(obj)
+    def and_equal(self, obj: Union[T, Dict[str, Any]]) -> 'Mapper[T]':
+        data = obj if isinstance(obj, dict) else Storage.of(obj)
         self._where_data.update(data)
         for key, val in data.items():
             sql = f'`{key}`=:{key}'

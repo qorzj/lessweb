@@ -150,7 +150,7 @@ def parse_cookie(http_cookie: str)->Dict[str, str]:
 
 
 class BadParamError(Exception):
-    def __init__(self, param: str, message: str):
+    def __init__(self, message: str, param: str=''):
         self.param: str = param
         self.message: str = message
 

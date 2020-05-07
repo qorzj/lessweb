@@ -135,7 +135,7 @@ def fetch_param(ctx: Context, fn: Callable) -> Tuple[List, Dict[str, Any]]:
             value = fetch_service(ctx, realtype)
         else:
             _, realtype = optional_core(realtype)
-            if not isinstance(realtype, type):
+            if not isinstance(realtype, type) and not is_generic_type(realtype):
                 raise BadParamError(param=realname, message='Unsupported type %s' % realtype)
             if positional_only:
                 value = fetch_model(ctx, realtype)
