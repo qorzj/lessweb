@@ -130,6 +130,8 @@ class Mapper(Generic[T]):
         self.model_type = cls
         self.tablename = getattr(cls, '__tablename__', '') or cls.__name__
         self.model_schema = Storage.type_hints(cls)
+        if hasattr(self, '__transient__'):
+            self.model_schema -= self.__transient__
         if not self.model_schema:
             raise TypeError('%s schema is empty!' % cls)
         self.primary_key = next(iter(self.model_schema))
