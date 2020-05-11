@@ -103,6 +103,18 @@ def table(*, name: str):
     return g
 
 
+def transient(*props: List[str]):
+    def g(cls):
+        if props:
+            cls_props = Storage.type_hints(cls)
+            for prop in props:
+                if prop not in cls_props:
+                    raise AttributeError(f"class {cls} has no attribute '{prop}' for @transient")
+            setattr(cls, '__transient__', props)
+        return cls
+    return g
+
+
 class Mapper(Generic[T]):
     session: Session
     model_type: Type[T]
@@ -137,6 +149,13 @@ class Mapper(Generic[T]):
         if self._orderby_sql:
             sql += f' ORDER BY {self._orderby_sql}'
         return sql
+
+    def _imtransient_storage(self, obj: T) -> Storage:
+        obj_storage = Storage.of(obj)
+        if hasattr(self, '__transient__'):
+            return obj_storage - self.__transient__
+        else:
+            return obj_storage
 
     def bridge(self, row) -> T:
         obj = self.model_type()
@@ -177,17 +196,17 @@ class Mapper(Generic[T]):
         return ret
 
     def insert(self, obj: T, commit: bool=True) -> None:
-        obj_storage = Storage.of(obj)
+        obj_storage = self._imtransient_storage(obj)
         titles = ','.join(f'`{key}`' for key in obj_storage.keys())
         slots = ','.join(f':{key}' for key in obj_storage.keys())
         sql = f'INSERT INTO `{self.tablename}` ({titles}) VALUES ({slots})'
-        result = self.session.execute(sql, Storage.of(obj))
+        result = self.session.execute(sql, obj_storage)
         setattr(obj, self.primary_key, result.lastrowid)
         if commit:
             self.session.commit()
 
     def insert_if_not_exist(self, obj: T, commit: bool=True) -> None:
-        obj_storage = Storage.of(obj)
+        obj_storage = self._imtransient_storage(obj)
         titles = ','.join(f'`{key}`' for key in obj_storage.keys())
         slots = ','.join(f':{key}_1' for key in obj_storage.keys())
         data = {f'{key}_1': val for key, val in obj_storage.items()}
@@ -202,7 +221,7 @@ class Mapper(Generic[T]):
             self.session.commit()
 
     def update(self, obj: T, commit: bool=True) -> None:
-        obj_storage = Storage.of(obj)
+        obj_storage = self._imtransient_storage(obj)
         set_sql = ', '.join(f'`{key}`=:{key}_1' for key in obj_storage.keys())
         data = {f'{key}_1': val for key, val in obj_storage.items()}
         data.update(self._where_data)
@@ -215,7 +234,8 @@ class Mapper(Generic[T]):
             self.session.commit()
 
     def increment(self, obj: T, commit: bool=True) -> None:
-        obj_dict = {key: val for key, val in Storage.of(obj).items() if isinstance(val, int)}
+        obj_storage = self._imtransient_storage(obj)
+        obj_dict = {key: val for key, val in obj_storage.items() if isinstance(val, int)}
         set_sql = ', '.join(f'`{key}`=`{key}`+(:{key}_1)' for key in obj_dict.keys())
         data = {f'{key}_1': val for key, val in obj_dict.items()}
         data.update(self._where_data)
@@ -244,7 +264,7 @@ class Mapper(Generic[T]):
         return self
 
     def and_equal(self, obj: Union[T, Dict[str, Any]]) -> 'Mapper[T]':
-        data = obj if isinstance(obj, dict) else Storage.of(obj)
+        data = obj if isinstance(obj, dict) else self._imtransient_storage(obj)
         self._where_data.update(data)
         for key, val in data.items():
             sql = f'`{key}`=:{key}'
