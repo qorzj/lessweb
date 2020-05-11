@@ -20,7 +20,7 @@ app.run()
 ```
 
 ## 文档：
-### http://lessweb.org
+### http://www.lessweb.cn
 
 ## 本地测试步骤：
 ```bash
