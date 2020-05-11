@@ -131,7 +131,7 @@ class Mapper(Generic[T]):
         self.tablename = getattr(cls, '__tablename__', '') or cls.__name__
         self.model_schema = Storage.type_hints(cls)
         if hasattr(cls, '__transient__'):
-            self.model_schema -= cls.__transient__
+            self.model_schema -= getattr(cls, '__transient__')
         if not self.model_schema:
             raise TypeError('%s schema is empty!' % cls)
         self.primary_key = next(iter(self.model_schema))
@@ -155,7 +155,7 @@ class Mapper(Generic[T]):
     def _imtransient_storage(self, obj: T) -> Storage:
         obj_storage = Storage.of(obj)
         if hasattr(self, '__transient__'):
-            return obj_storage - self.__transient__
+            return obj_storage - getattr(self, '__transient__')
         else:
             return obj_storage
 

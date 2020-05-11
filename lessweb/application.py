@@ -55,6 +55,8 @@ def build_controller(dealer):
     def _1_controller(ctx:Context):
         try:
             args, params = fetch_param(ctx, dealer)
+        except BadParamError:
+            raise
         except Exception as e:
             raise BadParamError(message=str(e), param='')
         return dealer(*args, **params)
