@@ -37,7 +37,7 @@ setup(
         version=version,
         description='A pythonic web framework 「嘞是web」',
         long_description='\nREADME: https://github.com/qorzj/lessweb\n\n'
-                         'Cookbook: http://lessweb.org',
+                         'Cookbook: http://www.lessweb.cn',
         url='https://github.com/qorzj/lessweb',
         author='qorzj',
         author_email='inull@qq.com',
