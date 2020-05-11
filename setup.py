@@ -35,7 +35,7 @@ class MyInstall(install):
 setup(
         name = 'lessweb',
         version=version,
-        description='Web framework for python3.6+ 「嘞是web」',
+        description='A pythonic web framework 「嘞是web」',
         long_description='\nREADME: https://github.com/qorzj/lessweb\n\n'
                          'Cookbook: http://lessweb.org',
         url='https://github.com/qorzj/lessweb',

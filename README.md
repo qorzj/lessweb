@@ -1,7 +1,7 @@
 # lessweb
 >「嘞是web」
 
-> "Django lets you write web apps in Django. Flask lets you write web apps in Flask. Lessweb lets you write web apps in Python."
+> A pythonic web framework
 
 ## Get lessweb
 ```bash
