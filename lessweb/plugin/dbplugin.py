@@ -103,7 +103,7 @@ def table(*, name: str):
     return g
 
 
-def transient(*props: List[str]):
+def transient(*props: str):
     def g(cls):
         if props:
             cls_props = Storage.type_hints(cls)
