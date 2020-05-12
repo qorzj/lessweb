@@ -12,7 +12,7 @@ from .storage import Storage
 __all__ = ['request_bridge']
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def model_or_service(cls: Type) -> int:
     """
     :return: 1=Model 2=Service 0=None
