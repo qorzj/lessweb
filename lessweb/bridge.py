@@ -44,6 +44,8 @@ def default_response_bridge(obj: Any) -> Jsonizable:
         return obj.isoformat()
     if isinstance(obj, Enum):
         return obj.value
+    if isinstance(obj, bytes):
+        return str(obj)
     return None
 
 

@@ -145,9 +145,9 @@ class Mapper(Generic[T]):
         where_clause = self._where_clause()
         titles = ','.join(f'`{key}`' for key in self.model_schema)
         if where_clause:
-            sql = f'SELECT {titles} FROM `{self.tablename}` WHERE {where_clause}'
+            sql = f'SELECT {titles} FROM {self.tablename} WHERE {where_clause}'
         else:
-            sql = f'SELECT {titles} FROM `{self.tablename}`'
+            sql = f'SELECT {titles} FROM {self.tablename}'
         if self._orderby_sql:
             sql += f' ORDER BY {self._orderby_sql}'
         return sql
@@ -177,9 +177,9 @@ class Mapper(Generic[T]):
     def select_count(self) -> int:
         where_clause = self._where_clause()
         if where_clause:
-            sql = f'SELECT COUNT(1) FROM `{self.tablename}` WHERE {where_clause}'
+            sql = f'SELECT COUNT(1) FROM {self.tablename} WHERE {where_clause}'
         else:
-            sql = f'SELECT COUNT(1) FROM `{self.tablename}`'
+            sql = f'SELECT COUNT(1) FROM {self.tablename}'
         return self.session.execute(sql, self._where_data).scalar()
 
     def select_first(self) -> Optional[T]:
