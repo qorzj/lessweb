@@ -1,25 +1,13 @@
-from lessweb import Application, Context
-
-def admin_hook(ctx: Context):
-    ctx.box['me'] = 'admin'
-    return ctx()
-
-def home(ctx: Context):
-    return 'Hello, %s!' % ctx.box.get('me', 'visitor')
+from lessweb import Application
+from http_basic_auth import BaseAuthPlugin
 
 
-wx_app = Application()
-wx_app.add_get_mapping('/hello', home)
+def home():
+    return 'Hello, admin!'
 
-admin_app = Application()
-admin_app.add_interceptor('.*', '*', admin_hook)
-admin_app.add_get_mapping('/hello', home)
 
+app = Application()
+app.add_plugin(BaseAuthPlugin(passwords={'admin': '123456'}))
+app.add_get_mapping('/', home)
 if __name__ == '__main__':
-    from aiohttp import web
-    from aiohttp_wsgi import WSGIHandler
-
-    aioapp = web.Application()
-    aioapp.router.add_route("*", "/wx/{path_info:.*}", WSGIHandler(wx_app.wsgifunc()))
-    aioapp.router.add_route("*", "/admin/{path_info:.*}", WSGIHandler(admin_app.wsgifunc()))
-    web.run_app(aioapp, port=8080)
+    app.run()
