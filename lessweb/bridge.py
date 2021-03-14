@@ -10,7 +10,6 @@ import json
 from .storage import Storage
 from .reflect import PropertyType, properties
 
-
 __all__ = ["uint", "Jsonizable", "ParamStr", "MultipartFile", "JsonBridgeFunc"]
 
 
@@ -71,51 +70,40 @@ def make_response_encoder(bridge_funcs: List[JsonBridgeFunc]):
     return ResponseEncoder
 
 
-T = TypeVar('T')
+from .reflect import properties, PropertyType
 
 
 def parse_timezone(text):
     return Time.fromisoformat(f'00:00:00{text}').tzinfo
 
 
-def parse_datetime(text, fmt, tz) -> Datetime:
-    if not fmt:
-        datetime_val = dateutil.parser.isoparse(text)
-    else:
-        datetime_val = Datetime.strptime(text, fmt)
-    if not datetime_val.tzinfo and tz:
-        return datetime_val.replace(tzinfo=parse_timezone(tz))
-    else:
-        return datetime_val
+def parse_datetime(text, tz) -> Datetime:
+    dt = dateutil.parser.isoparse(text)
+    return dt.astimezone(tz)
 
 
-def dump_datetime(data: Datetime, fmt, tz) -> str:
-    if not data.tzinfo and tz:
-        data = data.replace(tzinfo=parse_timezone(tz))
-    if fmt:
-        return data.strftime(fmt)
-    else:
-        return data.isoformat()
+def dump_datetime(data: Datetime, tz) -> str:
+    return data.astimezone(tz).isoformat()
 
 
 def parse_date(text) -> Date:
     return Date.fromisoformat(text)  # can only be isoformat
 
 
+def dump_date(data: Date):
+    return data.isoformat()
+
+
 def parse_time(text, tz) -> Time:
-    if text.endswith('Z'):  # can only be isoformat
-        text = text[:-1] + '+00:00'
-    time_val = Time.fromisoformat(text)
-    if not time_val.tzinfo and tz:
-        return time_val.replace(tzinfo=parse_timezone(tz))
-    else:
-        return time_val
+    return Time.fromisoformat(text).replace(tzinfo=tz)
 
 
 def dump_time(data: Time, tz) -> str:
-    if not data.tzinfo and tz:
-        data = data.replace(tzinfo=parse_timezone(tz))
-    return data.isoformat()
+    return data.replace(tzinfo=tz).isoformat()
+
+
+def parse_bool(text) -> bool:
+    return {'true': True, 'false': False}[text.lower()]
 
 
 def bridge(data, returntype, *, formatter=None) -> Any:
@@ -199,17 +187,87 @@ def bridge(data, returntype, *, formatter=None) -> Any:
         return ret_object
 
 
-def dump(data, *, formatter=None, maxdepth=None) -> Any:
-    if isinstance(data, (int, str, float)):  # bool is subclass of int
-        return data
-    elif isinstance(data, bytes):
-        return base64.b64decode(data)
-    elif isinstance(data, Datetime):
-        return dump_datetime(data, formatter.get('date-time'), formatter.get('tz'))
-    elif isinstance(data, Date):
-        return data.isoformat()
-    elif isinstance(data, Time):
-        return dump_time(data, formatter.get('tz'))
-    elif isinstance(data, dict):
-        if maxdepth == 0:
-            ...  # TODO
+json_basic_types = (bool, int, float, str, list, dict)
+
+
+class BridgeEncoder(JSONEncoder):
+    def default(self, obj):
+        if obj is None:
+            return obj
+        elif isinstance(obj, bytes):
+            return base64.b64encode(obj)
+        elif isinstance(obj, Enum):
+            return obj.value
+        elif isinstance(obj, Datetime):
+            return dump_datetime(obj, Bridge.tz)
+        elif isinstance(obj, Date):
+            return dump_date(obj)
+        elif isinstance(obj, Time):
+            return dump_time(obj, Bridge.tz)
+        elif not isinstance(obj, json_basic_types):
+            result = {}
+            for name in properties(type(obj)).keys():
+                value = getattr(obj, name, None)
+                if value is not None:
+                    result[name] = value
+            return result
+
+
+class Bridge:
+    tz = Datetime.now().astimezone().tzinfo
+
+    @classmethod
+    def parse(cls, text: str, tp) -> Any:
+        if issubclass(tp, bool):
+            return parse_bool(text)
+        elif issubclass(tp, int):
+            return tp(int(text))
+        elif issubclass(tp, (str, float, Enum)):
+            return tp(text)
+        elif tp is Datetime:
+            return parse_datetime(text, cls.tz)
+        elif tp is Date:
+            return parse_date(text)
+        elif tp is Time:
+            return parse_time(text, cls.tz)
+        else:
+            raise TypeError(f'unsupported type (got {tp})')
+
+    @classmethod
+    def load(cls, json_data, tp: PropertyType) -> Any:
+        clfr_type = tp.classifier()
+        if isinstance(json_data, list) and issubclass(clfr_type, list):
+            tp_args = tp.arguments()
+            if not tp_args:
+                return json_data
+            else:
+                return clfr_type(cls.load(item, tp_args[0]) for item in json_data)
+        elif isinstance(json_data, clfr_type):
+            return clfr_type(json_data)
+        elif isinstance(json_data, int) and issubclass(clfr_type, int):
+            return clfr_type(json_data)  # e.g. IntEnum
+        elif isinstance(json_data, str):
+            if clfr_type is bytes:
+                return base64.b64decode(json_data)
+            elif issubclass(clfr_type, Enum):
+                return clfr_type(json_data)
+            elif clfr_type is Datetime:
+                return parse_datetime(json_data, Bridge.tz)
+            elif clfr_type is Date:
+                return parse_date(json_data)
+            elif clfr_type is Time:
+                return parse_time(json_data, Bridge.tz)
+            else:
+                raise TypeError(f'cannot load str data "{json_data}" to {clfr_type}')
+        else:
+            result = {}
+            for name, member_type in properties(tp.classifier(), tp.arguments()).items():
+                value = json_data.get(name)
+                if value is None:
+                    continue
+                result[name] = cls.load(value, member_type)
+            return result
+
+    @classmethod
+    def dump(cls, type_data) -> Any:  # return: json_data
+        return json.loads(json.dumps(type_data, cls=BridgeEncoder))

@@ -96,9 +96,12 @@ class PropertyType:
         return show
 
 
-def properties(cls: Type) -> Dict[str, PropertyType]:
+def properties(cls: Type, generic_args: Tuple[PropertyType] = None) -> Dict[str, PropertyType]:
     result = {}
-    generic_map = PropertyType(cls).generic_map()
+    if generic_args is None:
+        generic_map = PropertyType(cls).generic_map()
+    else:
+        generic_map = {str(k): v for k, v in zip(get_args(get_generic_bases(cls)[0]), generic_args)}
     if is_generic_type(cls):
         cls = get_origin(cls)
     for prop_name, prop_type in get_type_hints(cls).items():
@@ -130,5 +133,8 @@ class Page(Generic[T, U]):
 
 
 if __name__ == '__main__':
-    for k, v in properties(Page[Optional[int], List[Union[str, bytes, None]]]).items():
-        print(k, str(v))
+    import jsonschema
+    data = {"result": 3}
+    schema = {'type': 'object', 'properties': {'result': {'type': 'integer', 'enum': [3, 4, 5]}}}
+    jsonschema.validate(instance=data, schema=schema,
+                        format_checker=jsonschema.draft7_format_checker)
