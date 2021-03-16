@@ -1,7 +1,7 @@
 from typing import Any, Tuple, Dict, Type, Callable
 
 
-__all__ = ["eafp", "_nil", "re_standardize", "func_arg_spec", "makedir"]
+__all__ = ["eafp", "re_standardize", "func_arg_spec", "makedir"]
 
 
 def eafp(ask: Callable, default: Any) -> Any: ...

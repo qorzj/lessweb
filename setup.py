@@ -49,7 +49,7 @@ setup(
         keywords='lessweb web web.py',
         packages = ['lessweb', 'lessweb.plugin', 'lessweb-stubs'],
         package_data={'lessweb-stubs': find_stub_files()},
-        install_requires=['aiohttp', 'aiohttp_wsgi', 'requests', 'typing_inspect', 'typing_extensions', 'python-dateutil'],
+        install_requires=['aiohttp', 'aiohttp_wsgi', 'requests', 'typing_inspect', 'typing_extensions', 'python-dateutil', 'jsonschema'],
 
         cmdclass={'install': MyInstall},
         entry_points={

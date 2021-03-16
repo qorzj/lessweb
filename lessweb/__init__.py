@@ -1,7 +1,7 @@
 """lessweb: 用最python3的方法创建web apps"""
 
 
-__version__ = '0.3.2'
+__version__ = '0.3.3'
 __author__ = [
     'qorzj <inull@qq.com>',
 ]
@@ -16,3 +16,5 @@ from .storage import Storage
 from .bridge import uint, ParamStr, MultipartFile, Jsonizable
 from .webapi import BadParamError, NotFoundError, Cookie, HttpStatus, ResponseStatus
 from .utils import _nil, eafp
+from .client import Client
+from .service import Service

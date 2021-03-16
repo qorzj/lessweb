@@ -36,6 +36,11 @@ from .webapi import (
     ResponseStatus as ResponseStatus,
 )
 from .utils import (
-    _nil as _nil,
     eafp as eafp,
+)
+from .client import (
+    Client as Client,
+)
+from .service import (
+    Service as Service
 )
